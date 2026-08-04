@@ -1,50 +1,101 @@
-# Welcome to your Expo app 👋
+# Anime Tracker
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+App móvil para seguir animes sincronizada con tu cuenta de [MyAnimeList](https://myanimelist.net/).
 
-## Get started
+## Qué es
 
-1. Install dependencies
+Anime Tracker es un cliente Expo (React Native) que lee y escribe tus listas de anime en MyAnimeList. Puedes buscar títulos, ver detalle y, con sesión iniciada, actualizar progreso, estado y puntuación.
+
+## Por qué
+
+MyAnimeList es la fuente de verdad: lo que marcas en la app queda en tu lista real de MAL. Sin login puedes explorar y buscar en modo invitado; con OAuth gestionas Watching, Plan to Watch, On Hold, Completed y Dropped desde el móvil.
+
+## Stack
+
+- Expo SDK 54, Expo Router, React Native
+- TanStack Query
+- OAuth 2.0 MyAnimeList (Authorization Code + PKCE)
+- APIs: MAL v2 (listas) y Jikan v4 (catálogo, con fallback a MAL)
+
+## Requisitos
+
+- Node.js (recomendado LTS)
+- Cuenta en [MyAnimeList API](https://myanimelist.net/apiconfig)
+- Cuenta [Expo](https://expo.dev/) para generar el development build (login OAuth)
+
+## Instalación
+
+1. Clona el repositorio:
+
+   ```bash
+   git clone git@github.com:InfinityJaaR/anime-tracker-app.git
+   cd anime-tracker-app
+   ```
+
+2. Registra una app en [myanimelist.net/apiconfig](https://myanimelist.net/apiconfig) y configura el **App Redirect URL** exactamente así:
+
+   ```
+   animetrackerapp://redirect
+   ```
+
+3. Copia las variables de entorno y pega tu Client ID:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   En `.env`:
+
+   ```
+   EXPO_PUBLIC_MAL_CLIENT_ID=tu_client_id
+   ```
+
+4. Instala dependencias:
 
    ```bash
    npm install
    ```
 
-2. Start the app
+## Cómo continuar el desarrollo
+
+El login con MyAnimeList **no funciona en Expo Go**: hace falta un development build con el scheme `animetrackerapp`.
+
+1. Inicia sesión en EAS:
 
    ```bash
-   npx expo start
+   npx eas-cli login
    ```
 
-In the output, you'll find options to open the app in a
+2. Genera el APK de desarrollo (Android):
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+   ```bash
+   npm run build:dev:android
+   ```
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+3. Instala el APK en el dispositivo o emulador.
 
-## Get a fresh project
+4. Arranca Metro con el dev client:
 
-When you're ready, run:
+   ```bash
+   npm run start:dev
+   ```
+
+Para explorar la UI sin OAuth (búsqueda / detalle en invitado):
 
 ```bash
-npm run reset-project
+npm start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### Scripts útiles
 
-## Learn more
+| Script | Descripción |
+|--------|-------------|
+| `npm start` | Metro (Expo) |
+| `npm run start:dev` | Dev client con tunnel |
+| `npm run build:dev:android` | Build EAS development (APK) |
+| `npm run lint` | ESLint |
 
-To learn more about developing your project with Expo, look at the following resources:
+## Documentación
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- [Expo SDK 54](https://docs.expo.dev/versions/v54.0.0/)
+- [MyAnimeList API](https://myanimelist.net/apiconfig)
