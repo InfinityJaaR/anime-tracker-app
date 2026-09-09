@@ -23,6 +23,11 @@ export interface MalMyListStatus {
   updated_at: string;
 }
 
+export interface MalGenre {
+  id: number;
+  name: string;
+}
+
 export interface MalAnimeNode {
   id: number;
   title: string;
@@ -33,6 +38,11 @@ export interface MalAnimeNode {
   /** Estado de emisión: finished_airing | currently_airing | not_yet_aired */
   status?: string;
   mean?: number;
+  genres?: MalGenre[];
+  /** tv | movie | ova | ona | special | music */
+  media_type?: string;
+  /** Duración media de un episodio en segundos. */
+  average_episode_duration?: number;
 }
 
 export interface MalListItem {
@@ -51,7 +61,8 @@ export interface MalUser {
   picture?: string;
 }
 
-const LIST_FIELDS = 'list_status,num_episodes,start_date,end_date,status,mean';
+const LIST_FIELDS =
+  'list_status,num_episodes,start_date,end_date,status,mean,genres,media_type,average_episode_duration';
 
 async function malFetch<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${MAL_API}${path}`, {
@@ -112,6 +123,7 @@ export interface UpdateListStatusParams {
   status?: MalWatchStatus;
   num_watched_episodes?: number;
   score?: number;
+  is_rewatching?: boolean;
 }
 
 /** Crea o actualiza la entrada del anime en mi lista. */
@@ -124,6 +136,7 @@ export function updateMyListStatus(
   if (params.status !== undefined) body.set('status', params.status);
   if (params.num_watched_episodes !== undefined) body.set('num_watched_episodes', String(params.num_watched_episodes));
   if (params.score !== undefined) body.set('score', String(params.score));
+  if (params.is_rewatching !== undefined) body.set('is_rewatching', String(params.is_rewatching));
 
   return malFetch(`/anime/${animeId}/my_list_status`, token, {
     method: 'PATCH',

@@ -111,6 +111,7 @@ function toListStatusPatch(params: UpdateListStatusParams) {
   if (params.status !== undefined) patch.status = params.status;
   if (params.num_watched_episodes !== undefined) patch.num_episodes_watched = params.num_watched_episodes;
   if (params.score !== undefined) patch.score = params.score;
+  if (params.is_rewatching !== undefined) patch.is_rewatching = params.is_rewatching;
   return patch;
 }
 

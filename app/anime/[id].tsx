@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -13,9 +13,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { UpdateModal } from '@/components/update-modal';
+import { EpisodePickerModal } from '@/components/episode-picker-modal';
+import { FullscreenImageModal } from '@/components/fullscreen-image-modal';
+import { ScorePickerModal, SCORE_LABELS } from '@/components/score-picker-modal';
+import { StatusPickerModal, STATUS_CHOICE_LABELS, type StatusChoice } from '@/components/status-picker-modal';
 import { AppColors } from '@/constants/theme';
-import { WATCH_STATUS_LABELS } from '@/lib/api/mal';
+import type { MalMyListStatus, UpdateListStatusParams } from '@/lib/api/mal';
 import { useAuth } from '@/lib/auth/auth-context';
 import {
   useAnimeCharacters,
@@ -23,6 +26,30 @@ import {
   useMyListStatus,
   useUpdateListStatus,
 } from '@/lib/queries';
+
+interface Draft {
+  choice: StatusChoice;
+  episodes: number;
+  score: number;
+}
+
+function toDraft(status: MalMyListStatus): Draft {
+  return {
+    choice: status.is_rewatching ? 'rewatching' : status.status,
+    episodes: status.num_episodes_watched,
+    score: status.score,
+  };
+}
+
+/** El draft se traduce a los campos que entiende MAL ("rewatching" no es un estado real). */
+function draftToParams(draft: Draft): UpdateListStatusParams {
+  return {
+    status: draft.choice === 'rewatching' ? 'watching' : draft.choice,
+    is_rewatching: draft.choice === 'rewatching',
+    num_watched_episodes: draft.episodes,
+    score: draft.score,
+  };
+}
 
 export default function AnimeDetailScreen() {
   const router = useRouter();
@@ -34,12 +61,35 @@ export default function AnimeDetailScreen() {
   const charactersQuery = useAnimeCharacters(animeId);
   const myStatusQuery = useMyListStatus(animeId);
   const updateMutation = useUpdateListStatus();
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
+
+  const [picker, setPicker] = useState<'status' | 'episodes' | 'score' | null>(null);
+  const [fullscreenUri, setFullscreenUri] = useState<string | null>(null);
 
   const anime = animeQuery.data;
   const myStatus = myStatusQuery.data?.my_list_status;
   const totalEpisodes = anime?.episodes ?? myStatusQuery.data?.num_episodes ?? 0;
   const watched = myStatus?.num_episodes_watched ?? 0;
+
+  // Los pickers solo tocan este borrador; nada viaja a MAL hasta pulsar UPDATE.
+  const savedDraft = useMemo(() => (myStatus ? toDraft(myStatus) : null), [myStatus]);
+  const [draft, setDraft] = useState<Draft | null>(savedDraft);
+
+  // Resincronizar cuando MAL devuelve un estado nuevo (carga inicial, +1, refetch).
+  useEffect(() => {
+    setDraft(savedDraft);
+  }, [savedDraft]);
+
+  const isDirty =
+    !!draft &&
+    !!savedDraft &&
+    (draft.choice !== savedDraft.choice ||
+      draft.episodes !== savedDraft.episodes ||
+      draft.score !== savedDraft.score);
+
+  const applyDraft = () => {
+    if (!draft || !isDirty) return;
+    updateMutation.mutate({ animeId, params: draftToParams(draft) });
+  };
 
   const plusOne = () => {
     const next = watched + 1;
@@ -81,24 +131,25 @@ export default function AnimeDetailScreen() {
     anime.trailer?.images?.large_image_url ??
     anime.images.jpg.large_image_url ??
     anime.images.jpg.image_url;
+  const coverUri = anime.images.jpg.large_image_url ?? anime.images.jpg.image_url;
 
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Banner + portada */}
         <View>
-          <Image source={{ uri: bannerUri }} style={styles.banner} contentFit="cover" />
-          <View style={styles.bannerOverlay} />
+          <Pressable onPress={() => setFullscreenUri(bannerUri)}>
+            <Image source={{ uri: bannerUri }} style={styles.banner} contentFit="cover" />
+            <View style={styles.bannerOverlay} />
+          </Pressable>
           <SafeAreaView style={styles.topBar} edges={['top']}>
             <Pressable onPress={() => router.back()} hitSlop={12}>
               <Ionicons name="arrow-back" size={26} color="#fff" />
             </Pressable>
           </SafeAreaView>
-          <Image
-            source={{ uri: anime.images.jpg.large_image_url ?? anime.images.jpg.image_url }}
-            style={styles.cover}
-            contentFit="cover"
-          />
+          <Pressable style={styles.cover} onPress={() => setFullscreenUri(coverUri)}>
+            <Image source={{ uri: coverUri }} style={styles.coverImage} contentFit="cover" />
+          </Pressable>
         </View>
 
         <View style={styles.titleBlock}>
@@ -110,23 +161,27 @@ export default function AnimeDetailScreen() {
 
         {/* Estado en mi lista */}
         {isAuthenticated ? (
-          myStatus ? (
+          draft ? (
             <>
               <View style={styles.statusRow}>
-                <View style={styles.statusItem}>
-                  <Ionicons name="calendar-outline" size={20} color={AppColors.text} />
-                  <Text style={styles.statusItemText}>{WATCH_STATUS_LABELS[myStatus.status]}</Text>
-                </View>
-                <View style={styles.statusItem}>
-                  <Ionicons name="eye-outline" size={20} color={AppColors.text} />
-                  <Text style={styles.statusItemText}>
-                    {watched}/{totalEpisodes > 0 ? totalEpisodes : '?'}
-                  </Text>
-                </View>
-                <View style={styles.statusItem}>
-                  <Ionicons name="thumbs-up-outline" size={20} color={AppColors.text} />
-                  <Text style={styles.statusItemText}>{myStatus.score || '—'}</Text>
-                </View>
+                <StatusItem
+                  icon="calendar-outline"
+                  label={STATUS_CHOICE_LABELS[draft.choice]}
+                  changed={draft.choice !== savedDraft?.choice}
+                  onPress={() => setPicker('status')}
+                />
+                <StatusItem
+                  icon="eye-outline"
+                  label={`${draft.episodes}/${totalEpisodes > 0 ? totalEpisodes : '?'}`}
+                  changed={draft.episodes !== savedDraft?.episodes}
+                  onPress={() => setPicker('episodes')}
+                />
+                <StatusItem
+                  icon="thumbs-up-outline"
+                  label={draft.score > 0 ? `${draft.score} ${SCORE_LABELS[draft.score]}` : '—'}
+                  changed={draft.score !== savedDraft?.score}
+                  onPress={() => setPicker('score')}
+                />
               </View>
               <Pressable
                 style={[styles.primaryButton, updateMutation.isPending && styles.disabled]}
@@ -134,7 +189,10 @@ export default function AnimeDetailScreen() {
                 disabled={updateMutation.isPending}>
                 <Text style={styles.primaryButtonText}>+1</Text>
               </Pressable>
-              <Pressable style={styles.outlineButton} onPress={() => setShowUpdateModal(true)}>
+              <Pressable
+                style={[styles.outlineButton, (!isDirty || updateMutation.isPending) && styles.disabled]}
+                onPress={applyDraft}
+                disabled={!isDirty || updateMutation.isPending}>
                 <Text style={styles.outlineButtonText}>UPDATE</Text>
               </Pressable>
             </>
@@ -222,16 +280,56 @@ export default function AnimeDetailScreen() {
         </View>
       </ScrollView>
 
-      <UpdateModal
-        visible={showUpdateModal}
-        onClose={() => setShowUpdateModal(false)}
-        initialStatus={myStatus?.status ?? 'watching'}
-        initialEpisodes={watched}
-        initialScore={myStatus?.score ?? 0}
+      <StatusPickerModal
+        visible={picker === 'status'}
+        value={draft?.choice ?? 'watching'}
+        onClose={() => setPicker(null)}
+        onSelect={(choice) => setDraft((d) => (d ? { ...d, choice } : d))}
+      />
+      <EpisodePickerModal
+        visible={picker === 'episodes'}
+        value={draft?.episodes ?? 0}
         totalEpisodes={totalEpisodes}
-        onSave={(params) => updateMutation.mutate({ animeId, params })}
+        onClose={() => setPicker(null)}
+        onSelect={(episodes) => setDraft((d) => (d ? { ...d, episodes } : d))}
+      />
+      <ScorePickerModal
+        visible={picker === 'score'}
+        value={draft?.score ?? 0}
+        onClose={() => setPicker(null)}
+        onSelect={(score) => setDraft((d) => (d ? { ...d, score } : d))}
+      />
+
+      <FullscreenImageModal
+        visible={fullscreenUri !== null}
+        uri={fullscreenUri ?? undefined}
+        title={anime.title}
+        onClose={() => setFullscreenUri(null)}
       />
     </View>
+  );
+}
+
+function StatusItem({
+  icon,
+  label,
+  changed,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  changed: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.statusItem, pressed && styles.statusItemPressed]}
+      onPress={onPress}>
+      <Ionicons name={icon} size={20} color={changed ? AppColors.accent : AppColors.text} />
+      <Text style={[styles.statusItemText, changed && styles.statusItemTextChanged]} numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -263,18 +361,28 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 2,
     borderColor: AppColors.background,
+    overflow: 'hidden',
   },
+  coverImage: { width: '100%', height: '100%' },
   titleBlock: { marginTop: 8, marginLeft: 120, marginRight: 16, minHeight: 48 },
   title: { color: AppColors.text, fontSize: 20, fontWeight: '700' },
   subtitle: { color: AppColors.textMuted, fontSize: 14, marginTop: 2 },
   statusRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
     marginTop: 20,
     marginHorizontal: 16,
   },
-  statusItem: { alignItems: 'center', gap: 4 },
+  statusItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderRadius: 10,
+  },
+  statusItemPressed: { backgroundColor: AppColors.surface },
   statusItemText: { color: AppColors.textMuted, fontSize: 13 },
+  statusItemTextChanged: { color: AppColors.accent, fontWeight: '700' },
   primaryButton: {
     backgroundColor: AppColors.accent,
     borderRadius: 8,
