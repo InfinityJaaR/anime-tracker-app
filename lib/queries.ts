@@ -8,6 +8,14 @@ import {
   getAnimeFullCatalog,
   searchAnimeCatalog,
 } from '@/lib/api/catalog';
+import { getRecentEpisodes } from '@/lib/api/jikan';
+import {
+  getAnimeRanking,
+  getSeasonAnime,
+  searchAnimeMal,
+  seasonOf,
+  type MalRankingType,
+} from '@/lib/api/mal-public';
 import {
   deleteFromMyList,
   getAnimeWithMyStatus,
@@ -162,5 +170,56 @@ export function useSearchAnime(query: string) {
     staleTime: 5 * 60 * 1000,
     retry: 1,
     queryFn: () => searchAnimeCatalog(trimmed),
+  });
+}
+
+// ---------- Descubrir ----------
+
+/**
+ * Estas secciones tiran de la API pública de MAL, no de Jikan: sus equivalentes
+ * (/top/anime, /seasons/now) devuelven 504 de forma sostenida. Cada sección tiene
+ * su propio hook para que una que falle no tumbe el resto de la pantalla.
+ */
+export function useAnimeRanking(rankingType: MalRankingType, enabled = true) {
+  return useQuery({
+    queryKey: ['discover', 'ranking', rankingType],
+    enabled,
+    staleTime: 30 * 60 * 1000,
+    retry: 1,
+    queryFn: () => getAnimeRanking(rankingType, 25),
+  });
+}
+
+export function useCurrentSeason() {
+  const { year, season } = seasonOf(new Date());
+  return useQuery({
+    queryKey: ['discover', 'season', year, season],
+    staleTime: 30 * 60 * 1000,
+    retry: 1,
+    queryFn: () => getSeasonAnime(year, season, 25),
+  });
+}
+
+export function useRecentEpisodes() {
+  return useQuery({
+    queryKey: ['discover', 'recent-episodes'],
+    staleTime: 30 * 60 * 1000,
+    retry: 1,
+    queryFn: () => getRecentEpisodes(),
+  });
+}
+
+/**
+ * Búsqueda general contra MAL público con lote grande, porque los filtros de
+ * género, tipo y puntuación se aplican después en cliente.
+ */
+export function useGlobalSearch(query: string) {
+  const trimmed = query.trim();
+  return useQuery({
+    queryKey: ['discover', 'global-search', trimmed],
+    enabled: trimmed.length >= 2,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    queryFn: () => searchAnimeMal(trimmed, 100),
   });
 }

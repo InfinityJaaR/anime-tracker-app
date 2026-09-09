@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
@@ -17,6 +18,7 @@ import { RadarChart } from '@/components/radar-chart';
 import { AppColors } from '@/constants/theme';
 import { WATCH_STATUS_LABELS, type MalWatchStatus } from '@/lib/api/mal';
 import { useAuth } from '@/lib/auth/auth-context';
+import { useFavorites } from '@/lib/favorites-context';
 import { useMyList } from '@/lib/queries';
 import { computeGenreStats, computeRank, computeSummary, formatWatchTime } from '@/lib/stats';
 
@@ -32,6 +34,7 @@ export default function StatsScreen() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const allQuery = useMyList('all');
+  const { favorites } = useFavorites();
   const [showLevels, setShowLevels] = useState(false);
 
   const items = useMemo(() => allQuery.data ?? [], [allQuery.data]);
@@ -141,6 +144,34 @@ export default function StatsScreen() {
             />
           </View>
 
+          {/* Personajes favoritos */}
+          <Pressable style={styles.card} onPress={() => router.push('/favorites')}>
+            <View style={styles.favoritesHeader}>
+              <Text style={styles.cardLabel}>Personajes favoritos</Text>
+              <View style={styles.favoritesLink}>
+                <Text style={styles.favoritesCount}>{favorites.length}</Text>
+                <Ionicons name="chevron-forward" size={18} color={AppColors.textMuted} />
+              </View>
+            </View>
+            {favorites.length ? (
+              <View style={styles.facesRow}>
+                {favorites.slice(0, 6).map((character) => (
+                  <Image
+                    key={character.id}
+                    source={{ uri: character.imageUrl }}
+                    style={styles.face}
+                    contentFit="cover"
+                    transition={150}
+                  />
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.emptyText}>
+                Toca el corazón de un personaje en el detalle de cualquier anime para guardarlo.
+              </Text>
+            )}
+          </Pressable>
+
           {/* Conteo por estado */}
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Por estado</Text>
@@ -234,6 +265,11 @@ const styles = StyleSheet.create({
   statValue: { color: AppColors.text, fontSize: 22, fontWeight: '800' },
   statLabel: { color: AppColors.textMuted, fontSize: 13, marginTop: 4 },
   statHint: { color: AppColors.textMuted, fontSize: 11, marginTop: 2, opacity: 0.8 },
+  favoritesHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  favoritesLink: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 8 },
+  favoritesCount: { color: AppColors.text, fontSize: 16, fontWeight: '700' },
+  facesRow: { flexDirection: 'row', gap: 8 },
+  face: { width: 46, height: 60, borderRadius: 6, backgroundColor: AppColors.surfaceLight },
   statusRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7 },
   statusLabel: { color: AppColors.textMuted, fontSize: 14 },
   statusValue: { color: AppColors.text, fontSize: 15, fontWeight: '600' },

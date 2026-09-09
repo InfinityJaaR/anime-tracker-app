@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 
 import { AppColors } from '@/constants/theme';
 import { AuthProvider } from '@/lib/auth/auth-context';
+import { FavoritesProvider } from '@/lib/favorites-context';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -40,14 +41,18 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <ThemeProvider value={navigationTheme}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="login" options={{ presentation: 'modal', headerShown: false }} />
-            <Stack.Screen name="anime/[id]" options={{ headerShown: false }} />
-          </Stack>
-          <StatusBar style="light" />
-        </ThemeProvider>
+        <FavoritesProvider>
+          <ThemeProvider value={navigationTheme}>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="login" options={{ presentation: 'modal', headerShown: false }} />
+              <Stack.Screen name="anime/[id]" options={{ headerShown: false }} />
+              <Stack.Screen name="favorites" options={{ headerShown: false }} />
+              <Stack.Screen name="search" options={{ headerShown: false }} />
+            </Stack>
+            <StatusBar style="light" />
+          </ThemeProvider>
+        </FavoritesProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

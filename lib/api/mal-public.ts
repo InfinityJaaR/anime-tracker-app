@@ -31,6 +31,8 @@ const DETAIL_FIELDS = [
   'studios',
 ].join(',');
 
+// Incluye genres porque los filtros de la búsqueda se aplican en cliente:
+// MAL no acepta filtrar por género en la query.
 const SEARCH_FIELDS = [
   'id',
   'title',
@@ -42,6 +44,21 @@ const SEARCH_FIELDS = [
   'media_type',
   'status',
   'num_episodes',
+  'genres',
+  'synopsis',
+].join(',');
+
+const BROWSE_FIELDS = [
+  'id',
+  'title',
+  'main_picture',
+  'alternative_titles',
+  'mean',
+  'media_type',
+  'status',
+  'num_episodes',
+  'start_season',
+  'genres',
 ].join(',');
 
 interface MalPicture {
@@ -210,4 +227,55 @@ export async function getAnimeFullMal(malId: number): Promise<JikanAnime> {
   const params = new URLSearchParams({ fields: DETAIL_FIELDS });
   const anime = await malPublicFetch<MalAnimeDetail>(`/anime/${malId}?${params.toString()}`);
   return malAnimeToJikan(anime);
+}
+
+/**
+ * Rankings oficiales de MAL. Son la fuente de Descubrir porque los equivalentes
+ * de Jikan (/top/anime, /seasons/now) responden 504 de forma habitual.
+ */
+export type MalRankingType = 'all' | 'airing' | 'upcoming' | 'tv' | 'movie' | 'ova' | 'special' | 'bypopularity' | 'favorite';
+
+export async function getAnimeRanking(
+  rankingType: MalRankingType,
+  limit = 20,
+): Promise<JikanAnime[]> {
+  const params = new URLSearchParams({
+    ranking_type: rankingType,
+    limit: String(limit),
+    fields: BROWSE_FIELDS,
+    nsfw: 'true',
+  });
+  const page = await malPublicFetch<{ data: { node: MalAnimeDetail }[] }>(
+    `/anime/ranking?${params.toString()}`,
+  );
+  return page.data.map((item) => malAnimeToJikan(item.node));
+}
+
+export type AnimeSeason = 'winter' | 'spring' | 'summer' | 'fall';
+
+/** Temporada del año a la que pertenece una fecha. */
+export function seasonOf(date: Date): { year: number; season: AnimeSeason } {
+  const month = date.getMonth();
+  const season: AnimeSeason =
+    month <= 1 || month === 11 ? 'winter' : month <= 4 ? 'spring' : month <= 7 ? 'summer' : 'fall';
+  // Diciembre pertenece al invierno del año siguiente en la nomenclatura de MAL.
+  const year = month === 11 ? date.getFullYear() + 1 : date.getFullYear();
+  return { year, season };
+}
+
+export async function getSeasonAnime(
+  year: number,
+  season: AnimeSeason,
+  limit = 20,
+): Promise<JikanAnime[]> {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    fields: BROWSE_FIELDS,
+    sort: 'anime_num_list_users',
+    nsfw: 'true',
+  });
+  const page = await malPublicFetch<{ data: { node: MalAnimeDetail }[] }>(
+    `/anime/season/${year}/${season}?${params.toString()}`,
+  );
+  return page.data.map((item) => malAnimeToJikan(item.node));
 }

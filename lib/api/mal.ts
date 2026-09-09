@@ -43,6 +43,7 @@ export interface MalAnimeNode {
   media_type?: string;
   /** Duración media de un episodio en segundos. */
   average_episode_duration?: number;
+  alternative_titles?: { en?: string; ja?: string; synonyms?: string[] };
 }
 
 export interface MalListItem {
@@ -61,8 +62,9 @@ export interface MalUser {
   picture?: string;
 }
 
+// alternative_titles permite buscar en la lista por título en inglés o sinónimos.
 const LIST_FIELDS =
-  'list_status,num_episodes,start_date,end_date,status,mean,genres,media_type,average_episode_duration';
+  'list_status,num_episodes,start_date,end_date,status,mean,genres,media_type,average_episode_duration,alternative_titles';
 
 async function malFetch<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${MAL_API}${path}`, {

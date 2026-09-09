@@ -129,8 +129,8 @@ export default function HomeScreen() {
               <Pressable style={styles.loginButton} onPress={() => router.push('/login')}>
                 <Text style={styles.loginButtonText}>Iniciar sesión con MAL</Text>
               </Pressable>
-              <Pressable style={styles.secondaryButton} onPress={() => router.push('/(tabs)/search')}>
-                <Text style={styles.secondaryButtonText}>Buscar animes</Text>
+              <Pressable style={styles.secondaryButton} onPress={() => router.push('/(tabs)/discover')}>
+                <Text style={styles.secondaryButtonText}>Descubrir animes</Text>
               </Pressable>
             </>
           )}

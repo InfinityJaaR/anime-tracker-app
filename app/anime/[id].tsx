@@ -13,13 +13,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CharacterCard } from '@/components/character-card';
+import { ConfirmUpdateModal, type DraftChange } from '@/components/confirm-update-modal';
 import { EpisodePickerModal } from '@/components/episode-picker-modal';
 import { FullscreenImageModal } from '@/components/fullscreen-image-modal';
 import { ScorePickerModal, SCORE_LABELS } from '@/components/score-picker-modal';
 import { StatusPickerModal, STATUS_CHOICE_LABELS, type StatusChoice } from '@/components/status-picker-modal';
+import { UpdateButton } from '@/components/update-button';
 import { AppColors } from '@/constants/theme';
 import type { MalMyListStatus, UpdateListStatusParams } from '@/lib/api/mal';
 import { useAuth } from '@/lib/auth/auth-context';
+import { useFavorites } from '@/lib/favorites-context';
 import {
   useAnimeCharacters,
   useAnimeFull,
@@ -61,9 +65,11 @@ export default function AnimeDetailScreen() {
   const charactersQuery = useAnimeCharacters(animeId);
   const myStatusQuery = useMyListStatus(animeId);
   const updateMutation = useUpdateListStatus();
+  const { isFavorite, toggle: toggleFavorite } = useFavorites();
 
   const [picker, setPicker] = useState<'status' | 'episodes' | 'score' | null>(null);
   const [fullscreenUri, setFullscreenUri] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   const anime = animeQuery.data;
   const myStatus = myStatusQuery.data?.my_list_status;
@@ -86,9 +92,41 @@ export default function AnimeDetailScreen() {
       draft.episodes !== savedDraft.episodes ||
       draft.score !== savedDraft.score);
 
-  const applyDraft = () => {
+  // Resumen que se muestra en la confirmación antes de escribir en MAL.
+  const pendingChanges: DraftChange[] = useMemo(() => {
+    if (!draft || !savedDraft) return [];
+    const list: DraftChange[] = [];
+    if (draft.choice !== savedDraft.choice) {
+      list.push({
+        label: 'Estado',
+        from: STATUS_CHOICE_LABELS[savedDraft.choice],
+        to: STATUS_CHOICE_LABELS[draft.choice],
+      });
+    }
+    if (draft.episodes !== savedDraft.episodes) {
+      const total = totalEpisodes > 0 ? totalEpisodes : '?';
+      list.push({
+        label: 'Episodios vistos',
+        from: `${savedDraft.episodes}/${total}`,
+        to: `${draft.episodes}/${total}`,
+      });
+    }
+    if (draft.score !== savedDraft.score) {
+      list.push({
+        label: 'Puntuación',
+        from: savedDraft.score > 0 ? `${savedDraft.score} ${SCORE_LABELS[savedDraft.score]}` : 'Sin puntuar',
+        to: draft.score > 0 ? `${draft.score} ${SCORE_LABELS[draft.score]}` : 'Sin puntuar',
+      });
+    }
+    return list;
+  }, [draft, savedDraft, totalEpisodes]);
+
+  const confirmDraft = () => {
     if (!draft || !isDirty) return;
-    updateMutation.mutate({ animeId, params: draftToParams(draft) });
+    updateMutation.mutate(
+      { animeId, params: draftToParams(draft) },
+      { onSettled: () => setConfirming(false) },
+    );
   };
 
   const plusOne = () => {
@@ -189,12 +227,11 @@ export default function AnimeDetailScreen() {
                 disabled={updateMutation.isPending}>
                 <Text style={styles.primaryButtonText}>+1</Text>
               </Pressable>
-              <Pressable
-                style={[styles.outlineButton, (!isDirty || updateMutation.isPending) && styles.disabled]}
-                onPress={applyDraft}
-                disabled={!isDirty || updateMutation.isPending}>
-                <Text style={styles.outlineButtonText}>UPDATE</Text>
-              </Pressable>
+              <UpdateButton
+                active={isDirty}
+                disabled={updateMutation.isPending}
+                onPress={() => setConfirming(true)}
+              />
             </>
           ) : myStatusQuery.isLoading ? (
             <ActivityIndicator color={AppColors.accent} style={{ marginVertical: 16 }} />
@@ -263,16 +300,22 @@ export default function AnimeDetailScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.charactersRow}>
                 {(charactersQuery.data ?? []).slice(0, 15).map((entry) => (
-                  <View key={entry.character.mal_id} style={styles.characterCard}>
-                    <Image
-                      source={{ uri: entry.character.images.jpg.image_url }}
-                      style={styles.characterImage}
-                      contentFit="cover"
-                    />
-                    <Text style={styles.characterName} numberOfLines={2}>
-                      {entry.character.name}
-                    </Text>
-                  </View>
+                  <CharacterCard
+                    key={entry.character.mal_id}
+                    name={entry.character.name}
+                    imageUrl={entry.character.images.jpg.image_url}
+                    favorite={isFavorite(entry.character.mal_id)}
+                    onToggleFavorite={() =>
+                      toggleFavorite({
+                        id: entry.character.mal_id,
+                        name: entry.character.name,
+                        imageUrl: entry.character.images.jpg.image_url,
+                        animeId,
+                        animeTitle: anime.title,
+                      })
+                    }
+                    onPress={() => setFullscreenUri(entry.character.images.jpg.image_url)}
+                  />
                 ))}
               </View>
             </ScrollView>
@@ -298,6 +341,15 @@ export default function AnimeDetailScreen() {
         value={draft?.score ?? 0}
         onClose={() => setPicker(null)}
         onSelect={(score) => setDraft((d) => (d ? { ...d, score } : d))}
+      />
+
+      <ConfirmUpdateModal
+        visible={confirming}
+        animeTitle={anime.title}
+        changes={pendingChanges}
+        pending={updateMutation.isPending}
+        onCancel={() => setConfirming(false)}
+        onConfirm={confirmDraft}
       />
 
       <FullscreenImageModal
@@ -427,7 +479,4 @@ const styles = StyleSheet.create({
   genreText: { color: AppColors.text, fontSize: 13 },
   synopsis: { color: AppColors.textMuted, fontSize: 14, lineHeight: 21 },
   charactersRow: { flexDirection: 'row', gap: 12 },
-  characterCard: { width: 100 },
-  characterImage: { width: 100, height: 130, borderRadius: 8 },
-  characterName: { color: AppColors.text, fontSize: 13, marginTop: 6, textAlign: 'center' },
 });

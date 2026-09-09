@@ -150,3 +150,23 @@ export async function getAnimeCharacters(malId: number): Promise<JikanCharacterE
   const result = await jikanFetch<{ data: JikanCharacterEntry[] }>(`/anime/${malId}/characters`);
   return result.data;
 }
+
+export interface JikanWatchEntry {
+  entry: {
+    mal_id: number;
+    url: string;
+    images: { jpg: JikanImage; webp?: JikanImage };
+    title: string;
+  };
+  episodes: { mal_id: number; url: string; title: string; premium?: boolean }[];
+  region_locked?: boolean;
+}
+
+/**
+ * Episodios publicados recientemente. MAL no tiene equivalente, así que esta
+ * sección depende de Jikan; es de los pocos endpoints suyos que responde estable.
+ */
+export async function getRecentEpisodes(): Promise<JikanWatchEntry[]> {
+  const result = await jikanFetch<{ data: JikanWatchEntry[] }>('/watch/episodes');
+  return result.data;
+}
