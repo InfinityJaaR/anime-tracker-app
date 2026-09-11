@@ -3,11 +3,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionMenu } from '@/components/action-menu';
 import { AnimeListCard } from '@/components/anime-list-card';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { LoginButton } from '@/components/login-button';
 import { StatusTabs, type StatusTab } from '@/components/status-tabs';
 import { AppColors } from '@/constants/theme';
 import type { MalListItem, MalWatchStatus } from '@/lib/api/mal';
@@ -23,12 +25,20 @@ const STATUS_ORDER: { key: ListFilter; label: string }[] = [
   { key: 'all', label: 'All' },
 ];
 
+interface PendingConfirm {
+  title: string;
+  message?: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading, user, signOut, restoreError } = useAuth();
   const [activeFilter, setActiveFilter] = useState<ListFilter>('watching');
   const [menuItem, setMenuItem] = useState<MalListItem | null>(null);
+  const [confirm, setConfirm] = useState<PendingConfirm | null>(null);
 
   // Se descarga la lista completa una sola vez y se filtra en cliente:
   // así los contadores de cada tab son exactos con una sola consulta.
@@ -80,17 +90,25 @@ export default function HomeScreen() {
   };
 
   const confirmDelete = (item: MalListItem) => {
-    Alert.alert('Eliminar anime', `¿Quitar "${item.node.title}" de tu lista?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: () => deleteMutation.mutate(item.node.id) },
-    ]);
+    // El ActionMenu aún se está cerrando: abrir otro Modal en el mismo frame
+    // falla de forma intermitente en Android.
+    requestAnimationFrame(() =>
+      setConfirm({
+        title: 'Eliminar anime',
+        message: `¿Quitar "${item.node.title}" de tu lista?`,
+        confirmLabel: 'ELIMINAR',
+        onConfirm: () => deleteMutation.mutate(item.node.id),
+      }),
+    );
   };
 
   const confirmSignOut = () => {
-    Alert.alert('Cerrar sesión', user ? `Sesión de ${user.name}` : undefined, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Cerrar sesión', style: 'destructive', onPress: () => signOut() },
-    ]);
+    setConfirm({
+      title: 'Cerrar sesión',
+      message: user ? `Se cerrará la sesión de ${user.name}.` : undefined,
+      confirmLabel: 'CERRAR SESIÓN',
+      onConfirm: () => signOut(),
+    });
   };
 
   return (
@@ -126,9 +144,7 @@ export default function HomeScreen() {
                 puedes buscar y explorar sin cuenta.
               </Text>
               {restoreError ? <Text style={styles.restoreError}>{restoreError}</Text> : null}
-              <Pressable style={styles.loginButton} onPress={() => router.push('/login')}>
-                <Text style={styles.loginButtonText}>Iniciar sesión con MAL</Text>
-              </Pressable>
+              <LoginButton />
               <Pressable style={styles.secondaryButton} onPress={() => router.push('/(tabs)/discover')}>
                 <Text style={styles.secondaryButtonText}>Descubrir animes</Text>
               </Pressable>
@@ -191,6 +207,19 @@ export default function HomeScreen() {
               ]
             : []
         }
+      />
+
+      <ConfirmDialog
+        visible={confirm !== null}
+        title={confirm?.title ?? ''}
+        message={confirm?.message}
+        confirmLabel={confirm?.confirmLabel ?? ''}
+        destructive
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          confirm?.onConfirm();
+          setConfirm(null);
+        }}
       />
     </SafeAreaView>
   );

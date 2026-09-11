@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LevelInfoModal } from '@/components/level-info-modal';
+import { LoginButton } from '@/components/login-button';
 import { RadarChart } from '@/components/radar-chart';
 import { AppColors } from '@/constants/theme';
 import { WATCH_STATUS_LABELS, type MalWatchStatus } from '@/lib/api/mal';
@@ -69,9 +70,7 @@ export default function StatsScreen() {
                 Inicia sesión con MyAnimeList para ver tu rango, tus géneros favoritos y el tiempo
                 que llevas viendo anime.
               </Text>
-              <Pressable style={styles.loginButton} onPress={() => router.push('/login')}>
-                <Text style={styles.loginButtonText}>Iniciar sesión con MAL</Text>
-              </Pressable>
+              <LoginButton />
             </>
           )}
         </View>

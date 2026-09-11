@@ -1,32 +1,45 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CharacterCard } from '@/components/character-card';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { AppColors } from '@/constants/theme';
 import { useFavorites } from '@/lib/favorites-context';
 import { groupByAnime } from '@/lib/favorites';
 
+interface PendingConfirm {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+}
+
 export default function FavoritesScreen() {
   const router = useRouter();
   const { favorites, remove, clear } = useFavorites();
+  const [confirm, setConfirm] = useState<PendingConfirm | null>(null);
 
   const groups = useMemo(() => groupByAnime(favorites), [favorites]);
 
   const confirmRemove = (id: number, name: string) => {
-    Alert.alert('Quitar de favoritos', `¿Quitar a ${name} de tus favoritos?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Quitar', style: 'destructive', onPress: () => remove(id) },
-    ]);
+    setConfirm({
+      title: 'Quitar de favoritos',
+      message: `¿Quitar a ${name} de tus favoritos?`,
+      confirmLabel: 'QUITAR',
+      onConfirm: () => remove(id),
+    });
   };
 
   const confirmClear = () => {
-    Alert.alert('Vaciar favoritos', `Se quitarán ${favorites.length} personajes.`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Vaciar', style: 'destructive', onPress: () => clear() },
-    ]);
+    setConfirm({
+      title: 'Vaciar favoritos',
+      message: `Se quitarán ${favorites.length} personajes.`,
+      confirmLabel: 'VACIAR',
+      onConfirm: () => clear(),
+    });
   };
 
   return (
@@ -87,6 +100,19 @@ export default function FavoritesScreen() {
           ))}
         </ScrollView>
       )}
+
+      <ConfirmDialog
+        visible={confirm !== null}
+        title={confirm?.title ?? ''}
+        message={confirm?.message}
+        confirmLabel={confirm?.confirmLabel ?? ''}
+        destructive
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          confirm?.onConfirm();
+          setConfirm(null);
+        }}
+      />
     </SafeAreaView>
   );
 }

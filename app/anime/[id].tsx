@@ -17,6 +17,7 @@ import { CharacterCard } from '@/components/character-card';
 import { ConfirmUpdateModal, type DraftChange } from '@/components/confirm-update-modal';
 import { EpisodePickerModal } from '@/components/episode-picker-modal';
 import { FullscreenImageModal } from '@/components/fullscreen-image-modal';
+import { LoginButton } from '@/components/login-button';
 import { ScorePickerModal, SCORE_LABELS } from '@/components/score-picker-modal';
 import { StatusPickerModal, STATUS_CHOICE_LABELS, type StatusChoice } from '@/components/status-picker-modal';
 import { UpdateButton } from '@/components/update-button';
@@ -244,9 +245,11 @@ export default function AnimeDetailScreen() {
             </Pressable>
           )
         ) : (
-          <Pressable style={styles.outlineButton} onPress={() => router.push('/login')}>
-            <Text style={styles.outlineButtonText}>Inicia sesión con MAL para trackear</Text>
-          </Pressable>
+          <LoginButton
+            variant="outline"
+            label="Inicia sesión con MAL para trackear"
+            style={styles.loginButton}
+          />
         )}
 
         {/* Info */}
@@ -444,16 +447,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  outlineButton: {
-    borderWidth: 1.5,
-    borderColor: AppColors.accent,
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginTop: 10,
-  },
-  outlineButtonText: { color: AppColors.accent, fontSize: 15, fontWeight: '700' },
+  loginButton: { marginHorizontal: 16, marginTop: 10 },
   disabled: { opacity: 0.6 },
   card: {
     backgroundColor: AppColors.surface,

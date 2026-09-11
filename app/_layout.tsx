@@ -45,7 +45,6 @@ export default function RootLayout() {
           <ThemeProvider value={navigationTheme}>
             <Stack>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="login" options={{ presentation: 'modal', headerShown: false }} />
               <Stack.Screen name="anime/[id]" options={{ headerShown: false }} />
               <Stack.Screen name="favorites" options={{ headerShown: false }} />
               <Stack.Screen name="search" options={{ headerShown: false }} />
