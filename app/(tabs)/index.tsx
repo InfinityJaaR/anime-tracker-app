@@ -116,6 +116,9 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Home</Text>
         <View style={styles.headerActions}>
+          <Pressable hitSlop={12} onPress={() => router.push('/search')}>
+            <Ionicons name="search" size={25} color={AppColors.text} />
+          </Pressable>
           {isAuthenticated ? (
             <>
               <Pressable
