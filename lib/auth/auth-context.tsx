@@ -11,6 +11,7 @@
  *
  * El login es opcional: sin sesión la app funciona en modo invitado.
  */
+import { useQueryClient } from '@tanstack/react-query';
 import { exchangeCodeAsync, refreshAsync, TokenResponse } from 'expo-auth-session';
 import Constants from 'expo-constants';
 import * as Crypto from 'expo-crypto';
@@ -135,22 +136,30 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<MalUser | null>(null);
   const sessionRef = useRef<StoredSession | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [restoreError, setRestoreError] = useState<string | null>(null);
 
-  const applySession = useCallback(async (session: StoredSession | null) => {
-    sessionRef.current = session;
-    setIsAuthenticated(session !== null);
-    if (session) {
-      await saveSession(session);
-    } else {
-      await clearSession();
-      setUser(null);
-    }
-  }, []);
+  const applySession = useCallback(
+    async (session: StoredSession | null) => {
+      sessionRef.current = session;
+      setIsAuthenticated(session !== null);
+      if (session) {
+        await saveSession(session);
+      } else {
+        await clearSession();
+        setUser(null);
+        // El caché se persiste en disco, así que al quedarse sin sesión (cierre
+        // manual o refresh token revocado) hay que borrar los datos de la cuenta
+        // para que no los vea quien inicie sesión después.
+        queryClient.removeQueries({ queryKey: ['mal'] });
+      }
+    },
+    [queryClient],
+  );
 
   const getAccessToken = useCallback(async (): Promise<string> => {
     const session = sessionRef.current;

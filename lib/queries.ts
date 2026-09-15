@@ -43,7 +43,9 @@ export function useMyList(filter: ListFilter) {
   return useQuery({
     queryKey: listKey(filter),
     enabled: isAuthenticated,
-    staleTime: 60 * 1000,
+    // Lo único que cambia esta lista son las mutaciones propias, que ya la
+    // invalidan; para lo demás quedan el botón de refrescar y el pull-to-refresh.
+    staleTime: 30 * 60 * 1000,
     queryFn: async () => {
       const token = await getAccessToken();
       const status = filter === 'all' ? undefined : filter;
@@ -61,12 +63,25 @@ export function useMyList(filter: ListFilter) {
   });
 }
 
-/** Mi estado en la lista para un anime concreto (solo con sesión). */
+/**
+ * Mi estado en la lista para un anime concreto (solo con sesión).
+ *
+ * Se siembra desde la lista ya cacheada, que trae los dos únicos campos que
+ * consume el detalle (my_list_status y num_episodes). Heredando su frescura con
+ * initialDataUpdatedAt, abrir un anime recién visto no cuesta ninguna petición.
+ */
 export function useMyListStatus(animeId: number) {
   const { getAccessToken, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
+  const cachedList = queryClient.getQueryState<MalListItem[]>(listKey('all'));
+  const seed = cachedList?.data?.find((item) => item.node.id === animeId);
+
   return useQuery({
     queryKey: myStatusKey(animeId),
     enabled: isAuthenticated && Number.isFinite(animeId),
+    staleTime: 5 * 60 * 1000,
+    initialData: seed ? { ...seed.node, my_list_status: seed.list_status } : undefined,
+    initialDataUpdatedAt: seed ? cachedList?.dataUpdatedAt : undefined,
     queryFn: async () => {
       const token = await getAccessToken();
       return getAnimeWithMyStatus(token, animeId);

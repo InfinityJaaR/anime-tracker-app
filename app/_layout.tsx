@@ -1,5 +1,6 @@
 import { DarkTheme, ThemeProvider, type Theme } from '@react-navigation/native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { Stack } from 'expo-router';
 import * as SystemUI from 'expo-system-ui';
 import { StatusBar } from 'expo-status-bar';
@@ -9,6 +10,12 @@ import 'react-native-reanimated';
 import { AppColors } from '@/constants/theme';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import { FavoritesProvider } from '@/lib/favorites-context';
+import {
+  CACHE_BUSTER,
+  CACHE_MAX_AGE,
+  queryPersister,
+  shouldPersistQuery,
+} from '@/lib/query-persister';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -16,7 +23,12 @@ export const unstable_settings = {
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: 1 },
+    queries: {
+      retry: 1,
+      // Debe ser >= al maxAge del persister: con el valor por defecto (5 min) la
+      // recolección de basura tiraba el caché antes de que venciera su staleTime.
+      gcTime: CACHE_MAX_AGE,
+    },
   },
 });
 
@@ -39,7 +51,14 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{
+        persister: queryPersister,
+        maxAge: CACHE_MAX_AGE,
+        buster: CACHE_BUSTER,
+        dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
+      }}>
       <AuthProvider>
         <FavoritesProvider>
           <ThemeProvider value={navigationTheme}>
@@ -53,6 +72,6 @@ export default function RootLayout() {
           </ThemeProvider>
         </FavoritesProvider>
       </AuthProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }

@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import PagerView from 'react-native-pager-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionMenu } from '@/components/action-menu';
@@ -39,6 +40,7 @@ export default function HomeScreen() {
   const [activeFilter, setActiveFilter] = useState<ListFilter>('watching');
   const [menuItem, setMenuItem] = useState<MalListItem | null>(null);
   const [confirm, setConfirm] = useState<PendingConfirm | null>(null);
+  const pagerRef = useRef<PagerView>(null);
 
   // Se descarga la lista completa una sola vez y se filtra en cliente:
   // así los contadores de cada tab son exactos con una sola consulta.
@@ -70,10 +72,23 @@ export default function HomeScreen() {
     [allQuery.data, itemsByStatus],
   );
 
-  const visibleItems = useMemo(() => {
-    if (activeFilter === 'all') return allQuery.data ?? [];
-    return itemsByStatus.get(activeFilter) ?? [];
-  }, [activeFilter, allQuery.data, itemsByStatus]);
+  const itemsFor = (key: ListFilter) =>
+    key === 'all' ? (allQuery.data ?? []) : (itemsByStatus.get(key) ?? []);
+
+  const activeIndex = STATUS_ORDER.findIndex((status) => status.key === activeFilter);
+
+  /** Toque en una pestaña: mueve el pager, que a su vez confirma el estado. */
+  const goToTab = (key: ListFilter) => {
+    const index = STATUS_ORDER.findIndex((status) => status.key === key);
+    const adjacent = Math.abs(index - activeIndex) === 1;
+    setActiveFilter(key);
+    // El rAF deja montar la página destino antes del salto, y además evita el
+    // UIViewControllerHierarchyInconsistency de iOS que documenta la librería.
+    requestAnimationFrame(() => {
+      if (adjacent) pagerRef.current?.setPage(index);
+      else pagerRef.current?.setPageWithoutAnimation(index);
+    });
+  };
 
   const plusOneEpisode = (item: MalListItem) => {
     const total = item.node.num_episodes ?? 0;
@@ -156,7 +171,7 @@ export default function HomeScreen() {
         </View>
       ) : (
         <>
-          <StatusTabs tabs={tabs} active={activeFilter} onChange={setActiveFilter} />
+          <StatusTabs tabs={tabs} active={activeFilter} onChange={goToTab} />
           {allQuery.isLoading ? (
             <View style={styles.emptyState}>
               <ActivityIndicator color={AppColors.accent} size="large" />
@@ -171,25 +186,44 @@ export default function HomeScreen() {
               </Pressable>
             </View>
           ) : (
-            <FlatList
-              data={visibleItems}
-              keyExtractor={(item) => String(item.node.id)}
-              renderItem={({ item }) => (
-                <AnimeListCard
-                  item={item}
-                  onPress={() => router.push(`/anime/${item.node.id}`)}
-                  onMenu={() => setMenuItem(item)}
-                />
-              )}
-              contentContainerStyle={styles.listContent}
-              refreshing={allQuery.isRefetching}
-              onRefresh={() => allQuery.refetch()}
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>No hay animes en esta lista.</Text>
+            <PagerView
+              ref={pagerRef}
+              style={styles.pager}
+              initialPage={activeIndex}
+              offscreenPageLimit={1}
+              onPageSelected={(e) =>
+                setActiveFilter(STATUS_ORDER[e.nativeEvent.position].key)
+              }>
+              {STATUS_ORDER.map(({ key }, index) => (
+                // collapsable={false} es obligatorio en Android: si no, RN puede
+                // eliminar la View y tratar sus hijos como páginas separadas.
+                <View key={key} style={styles.page} collapsable={false}>
+                  {/* Solo la página activa y sus vecinas montan la lista, para no
+                      disparar seis lotes de imágenes al abrir Home. */}
+                  {Math.abs(index - activeIndex) <= 1 ? (
+                    <FlatList
+                      data={itemsFor(key)}
+                      keyExtractor={(item) => String(item.node.id)}
+                      renderItem={({ item }) => (
+                        <AnimeListCard
+                          item={item}
+                          onPress={() => router.push(`/anime/${item.node.id}`)}
+                          onMenu={() => setMenuItem(item)}
+                        />
+                      )}
+                      contentContainerStyle={styles.listContent}
+                      refreshing={allQuery.isRefetching}
+                      onRefresh={() => allQuery.refetch()}
+                      ListEmptyComponent={
+                        <View style={styles.emptyState}>
+                          <Text style={styles.emptyText}>No hay animes en esta lista.</Text>
+                        </View>
+                      }
+                    />
+                  ) : null}
                 </View>
-              }
-            />
+              ))}
+            </PagerView>
           )}
         </>
       )}
@@ -239,6 +273,9 @@ const styles = StyleSheet.create({
   },
   headerTitle: { color: AppColors.text, fontSize: 24, fontWeight: '700' },
   headerActions: { flexDirection: 'row', gap: 18 },
+  pager: { flex: 1 },
+  // flex: 1 no funciona en los hijos del pager; hay que dimensionarlos al 100%.
+  page: { width: '100%', height: '100%' },
   listContent: { paddingBottom: 24, paddingTop: 4 },
   emptyState: {
     flex: 1,
