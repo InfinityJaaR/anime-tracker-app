@@ -1,5 +1,6 @@
 /**
- * Hooks de TanStack Query: listas de MAL (persistencia) + datos de Jikan (lectura).
+ * Hooks de TanStack Query: listas de MAL (persistencia), datos de Jikan (lectura)
+ * y traducción de sinopsis (MyMemory).
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -26,6 +27,7 @@ import {
   updateMyListStatus,
   UpdateListStatusParams,
 } from '@/lib/api/mal';
+import { translateToSpanish } from '@/lib/api/translate';
 import { useAuth } from '@/lib/auth/auth-context';
 
 export type ListFilter = MalWatchStatus | 'all';
@@ -247,5 +249,22 @@ export function useGlobalSearch(query: string) {
     staleTime: 5 * 60 * 1000,
     retry: 1,
     queryFn: () => searchAnimeMal(trimmed, 100),
+  });
+}
+
+// ---------- Traducción ----------
+
+/**
+ * Sinopsis traducida al español bajo demanda. `enabled` lo controla el botón de
+ * la tarjeta: la petición a MyMemory solo sale la primera vez que se pulsa y el
+ * resultado se persiste (scope 'translation') para no gastar cuota diaria.
+ */
+export function useSynopsisTranslation(animeId: number, synopsis: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['translation', 'synopsis', animeId],
+    enabled: enabled && synopsis.length > 0 && Number.isFinite(animeId),
+    staleTime: Infinity,
+    retry: false,
+    queryFn: () => translateToSpanish(synopsis),
   });
 }

@@ -11,7 +11,7 @@ interface Props {
 }
 
 /**
- * Botón UPDATE del detalle. Usa el Animated de React Native (no Reanimated) para
+ * Botón "Actualizar" del detalle. Usa el Animated de React Native (no Reanimated) para
  * no depender del plugin de worklets, ya que el proyecto no tiene babel.config.js.
  */
 export function UpdateButton({ active, disabled, onPress }: Props) {
@@ -62,7 +62,7 @@ export function UpdateButton({ active, disabled, onPress }: Props) {
       pointerEvents={active ? 'auto' : 'none'}
       style={[styles.wrapper, { opacity: reveal, transform: [{ translateY }, { scale }] }]}>
       <Pressable style={styles.button} onPress={onPress} disabled={disabled || !active}>
-        <Text style={styles.text}>UPDATE</Text>
+        <Text style={styles.text}>Actualizar</Text>
       </Pressable>
     </Animated.View>
   );

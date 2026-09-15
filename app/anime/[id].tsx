@@ -21,6 +21,7 @@ import { FullscreenImageModal } from '@/components/fullscreen-image-modal';
 import { LoginButton } from '@/components/login-button';
 import { ScorePickerModal, SCORE_LABELS } from '@/components/score-picker-modal';
 import { StatusPickerModal, STATUS_CHOICE_LABELS, type StatusChoice } from '@/components/status-picker-modal';
+import { SynopsisCard } from '@/components/synopsis-card';
 import { UpdateButton } from '@/components/update-button';
 import { AppColors } from '@/constants/theme';
 import type { MalMyListStatus, UpdateListStatusParams } from '@/lib/api/mal';
@@ -79,7 +80,7 @@ export default function AnimeDetailScreen() {
   const myStatus = myStatusQuery.data?.my_list_status;
   const totalEpisodes = anime?.episodes ?? myStatusQuery.data?.num_episodes ?? 0;
 
-  // Los pickers solo tocan este borrador; nada viaja a MAL hasta pulsar UPDATE.
+  // Los pickers solo tocan este borrador; nada viaja a MAL hasta pulsar "Actualizar".
   const savedDraft = useMemo(() => (myStatus ? toDraft(myStatus) : null), [myStatus]);
   const [draft, setDraft] = useState<Draft | null>(savedDraft);
 
@@ -273,12 +274,7 @@ export default function AnimeDetailScreen() {
         ) : null}
 
         {/* Sinopsis */}
-        {anime.synopsis ? (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Sinopsis</Text>
-            <Text style={styles.synopsis}>{anime.synopsis}</Text>
-          </View>
-        ) : null}
+        {anime.synopsis ? <SynopsisCard animeId={animeId} synopsis={anime.synopsis} /> : null}
 
         {/* Personajes */}
         <View style={styles.card}>

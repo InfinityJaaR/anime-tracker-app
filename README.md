@@ -16,6 +16,7 @@ MyAnimeList es la fuente de verdad: lo que marcas en la app queda en tu lista re
 - TanStack Query
 - OAuth 2.0 MyAnimeList (Authorization Code + PKCE)
 - APIs: MAL v2 (listas) y Jikan v4 (catálogo, con fallback a MAL)
+- MyMemory (traducción de la sinopsis al español bajo demanda, sin clave)
 
 ## Requisitos
 
