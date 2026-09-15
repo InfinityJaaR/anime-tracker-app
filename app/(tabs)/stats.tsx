@@ -17,6 +17,7 @@ import { LevelInfoModal } from '@/components/level-info-modal';
 import { LoginButton } from '@/components/login-button';
 import { RadarChart } from '@/components/radar-chart';
 import { AppColors } from '@/constants/theme';
+import { getVersionLabel } from '@/lib/app-version';
 import { WATCH_STATUS_LABELS, type MalWatchStatus } from '@/lib/api/mal';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useFavorites } from '@/lib/favorites-context';
@@ -190,6 +191,8 @@ export default function StatsScreen() {
         </ScrollView>
       )}
 
+      <Text style={styles.versionFooter}>{getVersionLabel()}</Text>
+
       <LevelInfoModal
         visible={showLevels}
         onClose={() => setShowLevels(false)}
@@ -289,4 +292,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   loginButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  versionFooter: {
+    color: AppColors.textMuted,
+    fontSize: 11,
+    textAlign: 'center',
+    paddingVertical: 6,
+    opacity: 0.7,
+  },
 });

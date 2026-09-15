@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
+import { UpdateBanner } from '@/components/update-banner';
 import { AppColors } from '@/constants/theme';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import { FavoritesProvider } from '@/lib/favorites-context';
@@ -69,6 +70,7 @@ export default function RootLayout() {
               <Stack.Screen name="search" options={{ headerShown: false }} />
             </Stack>
             <StatusBar style="light" />
+            <UpdateBanner />
           </ThemeProvider>
         </FavoritesProvider>
       </AuthProvider>

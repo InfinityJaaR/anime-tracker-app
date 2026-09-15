@@ -90,13 +90,38 @@ npm start
 
 ### Android
 
-El instalable final es un **APK**. Se genera con:
+El instalable es un **APK** firmado por EAS. La idea es que cada usuario lo instale **una sola vez**: los cambios de interfaz y lógica se envían después por **EAS Update (OTA)** sin repartir APKs nuevas.
+
+#### 1. Primera instalación (una vez por dispositivo)
 
 ```bash
 npm run build:preview:android
 ```
 
-EAS lo firma con el keystore del proyecto, así que cada build nuevo se instala encima del anterior sin desinstalar. El enlace de descarga aparece al terminar.
+El enlace de descarga aparece al terminar. El APK del perfil `preview` escucha el canal `preview` de EAS Update.
+
+#### 2. Enviar cambios por OTA (flujo habitual)
+
+```bash
+npm run update:preview -- --message "Descripción del cambio"
+```
+
+Sirve para pantallas, componentes, estilos, lógica, llamadas a API y assets. Al abrir la app (o volver a ella desde segundo plano) el teléfono descarga el update y muestra el aviso **"Nueva versión disponible · Reiniciar"**; al tocarlo se aplica al instante.
+
+Cómo saber qué corre un teléfono: el pie de la pestaña **Stats** muestra `v1.0.0 · build original` (JS embebido en el APK) o `v1.0.0 · OTA a1b2c3d` (update recibido). Para revisar lo publicado: `eas update:list --branch preview`.
+
+#### 3. Cuándo hace falta un APK nuevo
+
+La compatibilidad entre APK y update la marca `runtimeVersion` con política `appVersion`: **el runtime es el campo `expo.version` de `app.json`**. Regla:
+
+| Cambio | Qué hacer |
+|--------|-----------|
+| Solo JS/TS, estilos, assets | `npm run update:preview -- --message "..."` |
+| Nueva dependencia **nativa**, actualización del SDK de Expo, cambios en `app.json` (plugins, permisos, icono, scheme) | Subir `expo.version` en `app.json` (p. ej. `1.0.0` → `1.1.0`), `npm run build:preview:android` y repartir el APK |
+
+Si publicas un update con un runtime distinto al del APK instalado, el teléfono simplemente lo ignora. Los APKs generados **antes** de integrar `expo-updates` nunca reciben OTA: hay que reinstalar una vez.
+
+Los updates se compilan en tu PC con `expo export`, así que leen el `.env` local; `--environment preview` además carga las variables definidas en EAS para ese entorno. El entorno `production` de EAS no tiene `EXPO_PUBLIC_MAL_CLIENT_ID`: si algún día usas `npm run update:production`, créala antes con `eas env:create`.
 
 ### iOS
 
@@ -148,7 +173,9 @@ El `ITSAppUsesNonExemptEncryption: false` de `app.json` evita que App Store Conn
 | `npm run start:dev` | Dev client con tunnel |
 | `npm run lint` | ESLint |
 | `npm run build:dev:android` | Dev client Android (APK) |
-| `npm run build:preview:android` | APK de uso final |
+| `npm run build:preview:android` | APK de uso final (instalar una vez; canal OTA `preview`) |
+| `npm run update:preview -- --message "..."` | Publica un update OTA al canal `preview` |
+| `npm run update:production -- --message "..."` | Publica un update OTA al canal `production` |
 | `npm run build:simulator:ios` | Build para el Simulador de iOS (sin cuenta Apple) |
 | `npm run build:preview:ios` | `.ipa` ad hoc (requiere cuenta Apple) |
 | `npm run build:production:ios` | `.ipa` para TestFlight / App Store |
@@ -158,3 +185,4 @@ El `ITSAppUsesNonExemptEncryption: false` de `app.json` evita que App Store Conn
 
 - [Expo SDK 54](https://docs.expo.dev/versions/v54.0.0/)
 - [MyAnimeList API](https://myanimelist.net/apiconfig)
+- [EAS Update](https://docs.expo.dev/eas-update/introduction/)
