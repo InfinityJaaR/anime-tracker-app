@@ -107,7 +107,7 @@ El enlace de descarga aparece al terminar. El APK del perfil `preview` escucha e
 npm run update:preview -- --message "Descripción del cambio"
 ```
 
-Sirve para pantallas, componentes, estilos, lógica, llamadas a API y assets. Al abrir la app (o volver a ella desde segundo plano) el teléfono descarga el update y muestra el aviso **"Nueva versión disponible · Reiniciar"**; al tocarlo se aplica al instante.
+Sirve para pantallas, componentes, estilos, lógica, llamadas a API y assets. Los scripts publican solo Android (`--platform android`): sin ese flag `eas update` también exporta el bundle web, que falla por `react-native-pager-view`, y la app no se distribuye como web. Para iOS habría que publicar aparte con `--platform ios`. Al abrir la app (o volver a ella desde segundo plano) el teléfono descarga el update y muestra el aviso **"Nueva versión disponible · Reiniciar"**; al tocarlo se aplica al instante.
 
 Cómo saber qué corre un teléfono: el pie de la pestaña **Stats** muestra `v1.0.0 · build original` (JS embebido en el APK) o `v1.0.0 · OTA a1b2c3d` (update recibido). Para revisar lo publicado: `eas update:list --branch preview`.
 
