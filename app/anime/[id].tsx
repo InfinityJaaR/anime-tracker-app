@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AnimePosterCard } from '@/components/anime-poster-card';
 import { CharacterCard } from '@/components/character-card';
 import { ConfirmUpdateModal, type DraftChange } from '@/components/confirm-update-modal';
 import { EpisodePickerModal } from '@/components/episode-picker-modal';
@@ -29,6 +30,7 @@ import {
   useAnimeCharacters,
   useAnimeFull,
   useMyListStatus,
+  useRelatedAnime,
   useUpdateListStatus,
 } from '@/lib/queries';
 
@@ -64,6 +66,7 @@ export default function AnimeDetailScreen() {
   const { isAuthenticated } = useAuth();
   const animeQuery = useAnimeFull(animeId);
   const charactersQuery = useAnimeCharacters(animeId);
+  const relatedQuery = useRelatedAnime(animeId);
   const myStatusQuery = useMyListStatus(animeId);
   const updateMutation = useUpdateListStatus();
   const { isFavorite, toggle: toggleFavorite } = useFavorites();
@@ -75,7 +78,6 @@ export default function AnimeDetailScreen() {
   const anime = animeQuery.data;
   const myStatus = myStatusQuery.data?.my_list_status;
   const totalEpisodes = anime?.episodes ?? myStatusQuery.data?.num_episodes ?? 0;
-  const watched = myStatus?.num_episodes_watched ?? 0;
 
   // Los pickers solo tocan este borrador; nada viaja a MAL hasta pulsar UPDATE.
   const savedDraft = useMemo(() => (myStatus ? toDraft(myStatus) : null), [myStatus]);
@@ -128,18 +130,6 @@ export default function AnimeDetailScreen() {
       { animeId, params: draftToParams(draft) },
       { onSettled: () => setConfirming(false) },
     );
-  };
-
-  const plusOne = () => {
-    const next = watched + 1;
-    if (totalEpisodes > 0 && next > totalEpisodes) return;
-    updateMutation.mutate({
-      animeId,
-      params: {
-        num_watched_episodes: next,
-        ...(totalEpisodes > 0 && next === totalEpisodes ? { status: 'completed' as const } : {}),
-      },
-    });
   };
 
   const addToList = () => {
@@ -203,31 +193,27 @@ export default function AnimeDetailScreen() {
           draft ? (
             <>
               <View style={styles.statusRow}>
-                <StatusItem
-                  icon="calendar-outline"
-                  label={STATUS_CHOICE_LABELS[draft.choice]}
+                <TrackingChip
+                  caption="Estado"
+                  value={STATUS_CHOICE_LABELS[draft.choice]}
                   changed={draft.choice !== savedDraft?.choice}
                   onPress={() => setPicker('status')}
                 />
-                <StatusItem
-                  icon="eye-outline"
-                  label={`${draft.episodes}/${totalEpisodes > 0 ? totalEpisodes : '?'}`}
+                <TrackingChip
+                  caption="Progreso"
+                  value={`${draft.episodes}/${totalEpisodes > 0 ? totalEpisodes : '?'}`}
                   changed={draft.episodes !== savedDraft?.episodes}
                   onPress={() => setPicker('episodes')}
                 />
-                <StatusItem
-                  icon="thumbs-up-outline"
-                  label={draft.score > 0 ? `${draft.score} ${SCORE_LABELS[draft.score]}` : '—'}
+                <TrackingChip
+                  caption="Nota"
+                  value={
+                    draft.score > 0 ? `${draft.score} ${SCORE_LABELS[draft.score]}` : 'Sin puntuar'
+                  }
                   changed={draft.score !== savedDraft?.score}
                   onPress={() => setPicker('score')}
                 />
               </View>
-              <Pressable
-                style={[styles.primaryButton, updateMutation.isPending && styles.disabled]}
-                onPress={plusOne}
-                disabled={updateMutation.isPending}>
-                <Text style={styles.primaryButtonText}>+1</Text>
-              </Pressable>
               <UpdateButton
                 active={isDirty}
                 disabled={updateMutation.isPending}
@@ -324,6 +310,36 @@ export default function AnimeDetailScreen() {
             </ScrollView>
           )}
         </View>
+
+        {/* Relacionados */}
+        {relatedQuery.isLoading ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Relacionados</Text>
+            <ActivityIndicator color={AppColors.accent} />
+          </View>
+        ) : relatedQuery.data && relatedQuery.data.length > 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Relacionados</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.charactersRow}>
+                {relatedQuery.data.map((item) => (
+                  <AnimePosterCard
+                    key={item.id}
+                    title={item.title}
+                    imageUrl={item.imageUrl}
+                    badge={item.relationLabel}
+                    onPress={() => router.push(`/anime/${item.id}`)}
+                  />
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        ) : relatedQuery.isSuccess ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Relacionados</Text>
+            <Text style={styles.synopsis}>Sin relacionados.</Text>
+          </View>
+        ) : null}
       </ScrollView>
 
       <StatusPickerModal
@@ -365,25 +381,34 @@ export default function AnimeDetailScreen() {
   );
 }
 
-function StatusItem({
-  icon,
-  label,
+function TrackingChip({
+  caption,
+  value,
   changed,
   onPress,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
+  caption: string;
+  value: string;
   changed: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
-      style={({ pressed }) => [styles.statusItem, pressed && styles.statusItemPressed]}
+      style={({ pressed }) => [
+        styles.trackingChip,
+        changed && styles.trackingChipChanged,
+        pressed && styles.statusItemPressed,
+      ]}
       onPress={onPress}>
-      <Ionicons name={icon} size={20} color={changed ? AppColors.accent : AppColors.text} />
-      <Text style={[styles.statusItemText, changed && styles.statusItemTextChanged]} numberOfLines={1}>
-        {label}
-      </Text>
+      <View style={styles.trackingChipBody}>
+        <Text style={styles.trackingCaption}>{caption}</Text>
+        <Text
+          style={[styles.trackingValue, changed && styles.statusItemTextChanged]}
+          numberOfLines={1}>
+          {value}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={16} color={AppColors.textMuted} />
     </Pressable>
   );
 }
@@ -425,19 +450,33 @@ const styles = StyleSheet.create({
   statusRow: {
     flexDirection: 'row',
     marginTop: 20,
-    marginHorizontal: 16,
+    marginHorizontal: 12,
+    gap: 8,
   },
-  statusItem: {
+  trackingChip: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingVertical: 10,
-    paddingHorizontal: 4,
+    backgroundColor: AppColors.surface,
     borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: AppColors.border,
   },
-  statusItemPressed: { backgroundColor: AppColors.surface },
-  statusItemText: { color: AppColors.textMuted, fontSize: 13 },
-  statusItemTextChanged: { color: AppColors.accent, fontWeight: '700' },
+  trackingChipChanged: { borderColor: AppColors.accent },
+  trackingChipBody: { flex: 1, gap: 2 },
+  trackingCaption: {
+    color: AppColors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  trackingValue: { color: AppColors.text, fontSize: 14, fontWeight: '700' },
+  statusItemPressed: { opacity: 0.85 },
+  statusItemTextChanged: { color: AppColors.accent },
   primaryButton: {
     backgroundColor: AppColors.accent,
     borderRadius: 8,

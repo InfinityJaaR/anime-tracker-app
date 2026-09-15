@@ -229,6 +229,54 @@ export async function getAnimeFullMal(malId: number): Promise<JikanAnime> {
   return malAnimeToJikan(anime);
 }
 
+export interface RelatedAnime {
+  id: number;
+  title: string;
+  imageUrl?: string;
+  relationLabel: string;
+}
+
+interface MalRelatedEntry {
+  node: {
+    id: number;
+    title: string;
+    main_picture?: MalPicture;
+  };
+  relation_type: string;
+  relation_type_formatted?: string;
+}
+
+const RELATION_LABELS: Record<string, string> = {
+  sequel: 'Secuela',
+  prequel: 'Precuela',
+  side_story: 'Historia paralela',
+  parent_story: 'Historia principal',
+  summary: 'Resumen',
+  alternative_version: 'Versión alternativa',
+  alternative_setting: 'Ambientación alternativa',
+  spin_off: 'Spin-off',
+  character: 'Personaje',
+  other: 'Otro',
+};
+
+function relationLabel(type: string, formatted?: string): string {
+  return RELATION_LABELS[type] ?? formatted ?? type;
+}
+
+/** Relaciones oficiales (secuela, precuela, etc.). Jikan /relations suele devolver 504. */
+export async function getRelatedAnime(malId: number): Promise<RelatedAnime[]> {
+  const params = new URLSearchParams({ fields: 'related_anime' });
+  const anime = await malPublicFetch<{ related_anime?: MalRelatedEntry[] }>(
+    `/anime/${malId}?${params.toString()}`,
+  );
+  return (anime.related_anime ?? []).map((entry) => ({
+    id: entry.node.id,
+    title: entry.node.title,
+    imageUrl: entry.node.main_picture?.large ?? entry.node.main_picture?.medium,
+    relationLabel: relationLabel(entry.relation_type, entry.relation_type_formatted),
+  }));
+}
+
 /**
  * Rankings oficiales de MAL. Son la fuente de Descubrir porque los equivalentes
  * de Jikan (/top/anime, /seasons/now) responden 504 de forma habitual.

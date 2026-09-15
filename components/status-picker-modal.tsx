@@ -11,12 +11,12 @@ import type { MalWatchStatus } from '@/lib/api/mal';
 export type StatusChoice = MalWatchStatus | 'rewatching';
 
 const OPTIONS: { key: StatusChoice; label: string }[] = [
-  { key: 'watching', label: 'Watching' },
-  { key: 'plan_to_watch', label: 'Planned' },
-  { key: 'on_hold', label: 'On Hold' },
-  { key: 'completed', label: 'Completed' },
-  { key: 'dropped', label: 'Dropped' },
-  { key: 'rewatching', label: 'Rewatching' },
+  { key: 'watching', label: 'Viendo' },
+  { key: 'plan_to_watch', label: 'Planeado' },
+  { key: 'on_hold', label: 'En pausa' },
+  { key: 'completed', label: 'Completado' },
+  { key: 'dropped', label: 'Abandonado' },
+  { key: 'rewatching', label: 'Reviendo' },
 ];
 
 export const STATUS_CHOICE_LABELS = Object.fromEntries(
@@ -35,7 +35,7 @@ export function StatusPickerModal({ visible, value, onClose, onSelect }: Props) 
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.panel} onPress={(e) => e.stopPropagation()}>
-          <Text style={styles.title}>Set your Status</Text>
+          <Text style={styles.title}>Estado</Text>
           {OPTIONS.map((option) => {
             const active = option.key === value;
             return (

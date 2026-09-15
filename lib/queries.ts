@@ -11,6 +11,7 @@ import {
 import { getRecentEpisodes } from '@/lib/api/jikan';
 import {
   getAnimeRanking,
+  getRelatedAnime,
   getSeasonAnime,
   searchAnimeMal,
   seasonOf,
@@ -174,6 +175,16 @@ export function useAnimeCharacters(animeId: number) {
     staleTime: 30 * 60 * 1000,
     retry: 1,
     queryFn: () => getAnimeCharactersCatalog(animeId),
+  });
+}
+
+export function useRelatedAnime(animeId: number) {
+  return useQuery({
+    queryKey: ['catalog', 'related', animeId],
+    enabled: Number.isFinite(animeId),
+    staleTime: 30 * 60 * 1000,
+    retry: 1,
+    queryFn: () => getRelatedAnime(animeId),
   });
 }
 

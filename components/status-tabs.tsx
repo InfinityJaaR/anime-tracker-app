@@ -36,6 +36,7 @@ export function StatusTabs({ tabs, active, onChange }: Props) {
     <ScrollView
       ref={scrollRef}
       horizontal
+      style={styles.scroll}
       showsHorizontalScrollIndicator={false}
       onLayout={(e) => setViewport(e.nativeEvent.layout.width)}
       contentContainerStyle={styles.container}>
@@ -61,6 +62,8 @@ export function StatusTabs({ tabs, active, onChange }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // Sin esto, el ScrollView horizontal crece en altura junto al PagerView.
+  scroll: { flexGrow: 0 },
   container: { paddingHorizontal: 8 },
   tab: { paddingHorizontal: 12, paddingTop: 10 },
   label: { color: AppColors.textMuted, fontSize: 14, fontWeight: '600', letterSpacing: 0.5 },
