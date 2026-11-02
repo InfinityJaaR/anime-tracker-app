@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LevelInfoModal } from '@/components/level-info-modal';
 import { LoginButton } from '@/components/login-button';
 import { RadarChart } from '@/components/radar-chart';
+import { MenuButton } from '@/components/menu-button';
 import { AppColors } from '@/constants/theme';
 import { getVersionLabel } from '@/lib/app-version';
 import { WATCH_STATUS_LABELS, type MalWatchStatus } from '@/lib/api/mal';
@@ -50,7 +51,10 @@ export default function StatsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Stats</Text>
+        <View style={styles.titleRow}>
+          <MenuButton />
+          <Text style={styles.headerTitle}>Stats</Text>
+        </View>
         {isAuthenticated ? (
           <Pressable style={styles.infoButton} hitSlop={10} onPress={() => setShowLevels(true)}>
             <Ionicons name="information-circle-outline" size={18} color={AppColors.accent} />
@@ -221,6 +225,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   headerTitle: { color: AppColors.text, fontSize: 24, fontWeight: '700' },
   infoButton: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   infoButtonText: { color: AppColors.accent, fontSize: 14, fontWeight: '700' },

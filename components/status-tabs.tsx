@@ -4,20 +4,20 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { AppColors } from '@/constants/theme';
 import type { ListFilter } from '@/lib/queries';
 
-export interface StatusTab {
-  key: ListFilter;
+export interface StatusTab<K extends string = ListFilter> {
+  key: K;
   label: string;
   count?: number;
 }
 
-interface Props {
-  tabs: StatusTab[];
-  active: ListFilter;
-  onChange: (key: ListFilter) => void;
+interface Props<K extends string> {
+  tabs: StatusTab<K>[];
+  active: K;
+  onChange: (key: K) => void;
 }
 
-/** Tabs horizontales por estado de la lista (Watching, Plan to Watch, ...). */
-export function StatusTabs({ tabs, active, onChange }: Props) {
+/** Tabs horizontales por estado de la lista (Watching, Plan to Watch, ...) o por día del calendario. */
+export function StatusTabs<K extends string = ListFilter>({ tabs, active, onChange }: Props<K>) {
   const scrollRef = useRef<ScrollView>(null);
   const layouts = useRef<Record<string, { x: number; width: number }>>({});
   const [viewport, setViewport] = useState(0);

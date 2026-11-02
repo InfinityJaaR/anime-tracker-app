@@ -1,15 +1,39 @@
 /**
- * Cliente de la API pública de Jikan v4 (https://docs.api.jikan.moe/).
+ * Cliente del catálogo de anime con Tenrai API (https://tenrai.org), que sustituye
+ * a la API pública de Jikan (descontinuada). Tenrai mantiene el esquema de Jikan v4,
+ * por eso el archivo y los tipos conservan el nombre `Jikan*`.
  * No requiere autenticación. Los IDs coinciden con los de MyAnimeList.
+ * Límites: 4 peticiones/s y 120/min por IP; en 429 se espera `Retry-After`.
  *
- * Jikan a veces responde 504 cuando no puede alcanzar MAL; por eso hay
- * reintentos con backoff. Para búsqueda/detalle también hay fallback a MAL
- * (ver lib/api/catalog.ts).
+ * Hay reintentos con backoff ante 429/5xx. Para búsqueda/detalle también hay
+ * fallback a MAL (ver lib/api/catalog.ts).
  */
 
-const JIKAN_API = 'https://api.jikan.moe/v4';
+const CATALOG_API = 'https://api.tenrai.org/v1';
+const ERROR_PREFIX = 'Tenrai';
 const RETRYABLE = new Set([429, 502, 503, 504]);
 const MAX_ATTEMPTS = 3;
+/** Sin límite, una petición colgada impide que se ejecute el fallback a MAL. */
+const REQUEST_TIMEOUT_MS = 8000;
+
+class JikanTimeoutError extends Error {
+  constructor() {
+    super(`${ERROR_PREFIX}: tiempo de espera agotado`);
+  }
+}
+
+async function fetchWithTimeout(url: string): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) throw new JikanTimeoutError();
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export interface JikanImage {
   image_url: string;
@@ -88,7 +112,7 @@ async function jikanFetch<T>(path: string): Promise<T> {
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      const response = await fetch(`${JIKAN_API}${path}`);
+      const response = await fetchWithTimeout(`${CATALOG_API}${path}`);
       if (response.ok) {
         return (await response.json()) as T;
       }
@@ -102,16 +126,23 @@ async function jikanFetch<T>(path: string): Promise<T> {
         // cuerpo no JSON
       }
 
-      const error = new Error(`Jikan ${response.status}: ${message || response.statusText}`);
+      const error = new Error(`${ERROR_PREFIX} ${response.status}: ${message || response.statusText}`);
       lastError = error;
 
       if (!RETRYABLE.has(response.status) || attempt === MAX_ATTEMPTS) {
         throw error;
       }
-      // Backoff: 600ms, 1200ms…
-      await sleep(600 * attempt);
+      // Backoff: 600ms, 1200ms…; en 429 se respeta Retry-After (acotado a 5 s).
+      const retryAfter = Number(response.headers.get('Retry-After'));
+      await sleep(
+        response.status === 429 && retryAfter > 0
+          ? Math.min(retryAfter, 5) * 1000
+          : 600 * attempt,
+      );
     } catch (error) {
-      if (error instanceof Error && error.message.startsWith('Jikan ')) {
+      // Un timeout no se reintenta: así el fallback a MAL entra en pocos segundos.
+      if (error instanceof JikanTimeoutError) throw error;
+      if (error instanceof Error && error.message.startsWith(`${ERROR_PREFIX} `)) {
         if (attempt === MAX_ATTEMPTS) throw error;
         lastError = error;
         await sleep(600 * attempt);
@@ -124,7 +155,7 @@ async function jikanFetch<T>(path: string): Promise<T> {
     }
   }
 
-  throw lastError ?? new Error('Jikan: error desconocido');
+  throw lastError ?? new Error(`${ERROR_PREFIX}: error desconocido`);
 }
 
 /** Búsqueda de anime por texto. */
@@ -151,22 +182,54 @@ export async function getAnimeCharacters(malId: number): Promise<JikanCharacterE
   return result.data;
 }
 
-export interface JikanWatchEntry {
-  entry: {
-    mal_id: number;
-    url: string;
-    images: { jpg: JikanImage; webp?: JikanImage };
-    title: string;
-  };
-  episodes: { mal_id: number; url: string; title: string; premium?: boolean }[];
-  region_locked?: boolean;
+/** Animes de la temporada en emisión, de 100 en 100 (tope de seguridad de 4 páginas). */
+export async function getSeasonNow(): Promise<JikanAnime[]> {
+  const all: JikanAnime[] = [];
+  for (let page = 1; page <= 4; page++) {
+    const result = await jikanFetch<JikanPage<JikanAnime>>(
+      `/seasons/now?limit=100&sfw=true&page=${page}`,
+    );
+    all.push(...result.data);
+    if (!result.pagination?.has_next_page) break;
+  }
+  return all;
 }
 
-/**
- * Episodios publicados recientemente. MAL no tiene equivalente, así que esta
- * sección depende de Jikan; es de los pocos endpoints suyos que responde estable.
- */
-export async function getRecentEpisodes(): Promise<JikanWatchEntry[]> {
-  const result = await jikanFetch<{ data: JikanWatchEntry[] }>('/watch/episodes');
-  return result.data;
+export interface AdvancedFilters {
+  /** tv | movie | special (valores de MAL en minúsculas). */
+  type: string | null;
+  minScore: number | null;
+  /** IDs de géneros de MAL. */
+  genres: number[];
+  /** Año de inicio mínimo: devuelve animes emitidos desde ese año. */
+  fromYear: number | null;
+}
+
+/** Búsqueda por filtros (sin texto), ordenada por puntuación. */
+export function searchAnimeFiltered(
+  filters: AdvancedFilters,
+  page: number,
+): Promise<JikanPage<JikanAnime>> {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: '25',
+    order_by: 'score',
+    sort: 'desc',
+    sfw: 'true',
+  });
+  if (filters.type) params.set('type', filters.type);
+  if (filters.minScore) params.set('min_score', String(filters.minScore));
+  if (filters.genres.length) params.set('genres', filters.genres.join(','));
+  if (filters.fromYear) params.set('start_date', `${filters.fromYear}-01-01`);
+  return jikanFetch(`/anime?${params.toString()}`);
+}
+
+/** Animes de una temporada, paginado. */
+export function getSeasonPage(
+  year: number,
+  season: string,
+  page: number,
+): Promise<JikanPage<JikanAnime>> {
+  const params = new URLSearchParams({ page: String(page), limit: '25', sfw: 'true' });
+  return jikanFetch(`/seasons/${year}/${season}?${params.toString()}`);
 }

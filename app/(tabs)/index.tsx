@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,10 +12,18 @@ import { AnimeListCard } from '@/components/anime-list-card';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { LoginButton } from '@/components/login-button';
 import { StatusTabs, type StatusTab } from '@/components/status-tabs';
+import { MenuButton } from '@/components/menu-button';
 import { AppColors } from '@/constants/theme';
+import { saveWatchingAiring, syncEpisodeNotifications } from '@/lib/airing-notifications';
 import type { MalListItem, MalWatchStatus } from '@/lib/api/mal';
 import { useAuth } from '@/lib/auth/auth-context';
-import { useDeleteFromList, useMyList, useUpdateListStatus, type ListFilter } from '@/lib/queries';
+import {
+  useAiringSchedule,
+  useDeleteFromList,
+  useMyList,
+  useUpdateListStatus,
+  type ListFilter,
+} from '@/lib/queries';
 
 const STATUS_ORDER: { key: ListFilter; label: string }[] = [
   { key: 'watching', label: 'Watching' },
@@ -47,6 +55,55 @@ export default function HomeScreen() {
   const allQuery = useMyList('all');
   const updateMutation = useUpdateListStatus();
   const deleteMutation = useDeleteFromList();
+
+  // Calendario de AniList para los animes en emisión de la lista.
+  const airingIds = useMemo(
+    () =>
+      (allQuery.data ?? [])
+        .filter((item) => item.node.status === 'currently_airing')
+        .map((item) => item.node.id),
+    [allQuery.data],
+  );
+  const airingQuery = useAiringSchedule(airingIds);
+  const airingSchedule = airingQuery.data;
+
+  // Reloj compartido por todas las tarjetas para refrescar la cuenta atrás.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Al pasar la hora de un episodio se pide el calendario real a AniList (una vez por hora de
+  // emisión) para reemplazar la estimación semanal por el dato confirmado.
+  const refetchedAt = useRef(new Set<string>());
+  useEffect(() => {
+    if (!airingSchedule) return;
+    for (const [id, info] of Object.entries(airingSchedule)) {
+      const key = `${id}-${info.airingAt}`;
+      if (info.airingAt <= now && !refetchedAt.current.has(key)) {
+        refetchedAt.current.add(key);
+        void airingQuery.refetch();
+      }
+    }
+  }, [airingSchedule, now, airingQuery]);
+
+  // Avisos de "ya salió el episodio" solo para los que están en Watching.
+  useEffect(() => {
+    if (!airingSchedule) return;
+    const entries = (allQuery.data ?? [])
+      .filter(
+        (item) =>
+          item.list_status.status === 'watching' && item.node.status === 'currently_airing',
+      )
+      .map((item) => ({
+        malId: item.node.id,
+        title: item.node.title,
+        totalEpisodes: item.node.num_episodes ?? 0,
+      }));
+    saveWatchingAiring(entries);
+    syncEpisodeNotifications(entries, airingSchedule).catch(() => {});
+  }, [allQuery.data, airingSchedule]);
 
   const itemsByStatus = useMemo(() => {
     const groups = new Map<MalWatchStatus, MalListItem[]>();
@@ -129,7 +186,10 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Home</Text>
+        <View style={styles.titleRow}>
+          <MenuButton />
+          <Text style={styles.headerTitle}>Home</Text>
+        </View>
         <View style={styles.headerActions}>
           <Pressable hitSlop={12} onPress={() => router.push('/search')}>
             <Ionicons name="search" size={25} color={AppColors.text} />
@@ -207,11 +267,14 @@ export default function HomeScreen() {
                       renderItem={({ item }) => (
                         <AnimeListCard
                           item={item}
+                          airing={airingSchedule?.[item.node.id]}
+                          now={now}
                           onPress={() => router.push(`/anime/${item.node.id}`)}
                           onMenu={() => setMenuItem(item)}
                         />
                       )}
                       contentContainerStyle={styles.listContent}
+                      extraData={now}
                       refreshing={allQuery.isRefetching}
                       onRefresh={() => allQuery.refetch()}
                       ListEmptyComponent={
@@ -271,6 +334,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   headerTitle: { color: AppColors.text, fontSize: 24, fontWeight: '700' },
   headerActions: { flexDirection: 'row', gap: 18 },
   pager: { flex: 1 },

@@ -15,8 +15,26 @@ MyAnimeList es la fuente de verdad: lo que marcas en la app queda en tu lista re
 - Expo SDK 54, Expo Router, React Native
 - TanStack Query
 - OAuth 2.0 MyAnimeList (Authorization Code + PKCE)
-- APIs: MAL v2 (listas) y Jikan v4 (catálogo, con fallback a MAL)
+- APIs: MAL v2 (listas) y Tenrai API (catálogo, esquema Jikan v4; con fallback a MAL en detalle y búsqueda)
 - MyMemory (traducción de la sinopsis al español bajo demanda, sin clave)
+
+## Menú lateral (v1.2.0)
+
+La hamburguesa de las pestañas abre un menú con: **Favoritos** (series completadas con nota 8–10 y personajes), **Anime aleatorio** (de tu Plan to Watch), **Recomendaciones** (sugerencias de MAL, con géneros excluibles), **Búsqueda avanzada**, **Temporadas de anime** y, fija abajo, **Configuración** (cuentas, apariencia, sobre nosotros). Es la versión `1.2.0`: al cambiar `expo.version` cambia el runtime de EAS Update, así que requiere un APK nuevo (`npm run build:preview:android`); los APK 1.1.0 no reciben estos cambios por OTA.
+
+## Publicar una versión nueva del APK (aviso de descarga)
+
+Un OTA no llega a APKs con otra `expo.version`, así que las versiones nuevas se anuncian con **GitHub Releases**: la app (y su tarea de fondo, ~cada hora) consulta la última release del repo y, si su tag es mayor que la versión instalada, muestra el banner "Versión X disponible · Descargar" y lanza una notificación que abre el APK.
+
+1. Sube `expo.version` en `app.json` (p. ej. `1.3.0`) y haz `npm run build:preview:android`.
+2. Descarga el APK del build (enlace de EAS) a `anime-tracker-1.3.0.apk`.
+3. Publica la release **con tag `v` + versión** y el APK como asset:
+
+```bash
+gh release create v1.3.0 anime-tracker-1.3.0.apk --title "v1.3.0" --notes "Qué hay de nuevo"
+```
+
+El aviso solo funciona en APKs que ya traen este código (desde `1.2.0`): quien tenga una versión anterior debe instalar la `1.2.0` a mano una vez.
 
 ## Requisitos
 
@@ -109,7 +127,9 @@ npm run update:preview -- --message "Descripción del cambio"
 
 Sirve para pantallas, componentes, estilos, lógica, llamadas a API y assets. Los scripts publican solo Android (`--platform android`): sin ese flag `eas update` también exporta el bundle web, que falla por `react-native-pager-view`, y la app no se distribuye como web. Para iOS habría que publicar aparte con `--platform ios`. Al abrir la app (o volver a ella desde segundo plano) el teléfono descarga el update y muestra el aviso **"Nueva versión disponible · Reiniciar"**; al tocarlo se aplica al instante.
 
-Cómo saber qué corre un teléfono: el pie de la pestaña **Stats** muestra `v1.0.0 · build original` (JS embebido en el APK) o `v1.0.0 · OTA a1b2c3d` (update recibido). Para revisar lo publicado: `eas update:list --branch preview`.
+**Aviso con la app cerrada (desde `1.1.0`):** una tarea en segundo plano (`expo-background-task`, ver `lib/background-update-task.ts`) revisa cada ~1 h si hay un update, lo descarga y lanza una notificación local "Nueva versión disponible"; al tocarla la app abre y lo aplica. No usa push remoto, así que no necesita Firebase ni servidor. Android decide cuándo ejecuta la tarea (ahorro de batería, modo Doze), por lo que el aviso puede tardar horas. Si el usuario rechaza el permiso de notificaciones, solo queda el banner al abrir la app. En desarrollo no corre.
+
+Cómo saber qué corre un teléfono: el pie de la pestaña **Stats** muestra `v1.2.0 · build original` (JS embebido en el APK) o `v1.2.0 · OTA a1b2c3d` (update recibido). Para revisar lo publicado: `eas update:list --branch preview`.
 
 #### 3. Cuándo hace falta un APK nuevo
 
@@ -118,7 +138,7 @@ La compatibilidad entre APK y update la marca `runtimeVersion` con política `ap
 | Cambio | Qué hacer |
 |--------|-----------|
 | Solo JS/TS, estilos, assets | `npm run update:preview -- --message "..."` |
-| Nueva dependencia **nativa**, actualización del SDK de Expo, cambios en `app.json` (plugins, permisos, icono, scheme) | Subir `expo.version` en `app.json` (p. ej. `1.0.0` → `1.1.0`), `npm run build:preview:android` y repartir el APK |
+| Nueva dependencia **nativa**, actualización del SDK de Expo, cambios en `app.json` (plugins, permisos, icono, scheme) | Subir `expo.version` en `app.json` (p. ej. `1.2.0` → `1.3.0`), `npm run build:preview:android` y repartir el APK |
 
 Si publicas un update con un runtime distinto al del APK instalado, el teléfono simplemente lo ignora. Los APKs generados **antes** de integrar `expo-updates` nunca reciben OTA: hay que reinstalar una vez.
 

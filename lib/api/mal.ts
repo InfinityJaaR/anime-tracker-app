@@ -3,6 +3,8 @@
  * Requiere un access token OAuth2 (ver lib/auth). MAL es la fuente de verdad de las listas.
  */
 
+import type { MalAnimeDetail } from '@/lib/api/mal-public';
+
 const MAL_API = 'https://api.myanimelist.net/v2';
 
 export type MalWatchStatus = 'watching' | 'completed' | 'on_hold' | 'dropped' | 'plan_to_watch';
@@ -150,4 +152,26 @@ export function updateMyListStatus(
 /** Elimina el anime de mi lista. */
 export function deleteFromMyList(token: string, animeId: number): Promise<void> {
   return malFetch(`/anime/${animeId}/my_list_status`, token, { method: 'DELETE' });
+}
+
+export interface MalSuggestionPage {
+  data: { node: MalAnimeDetail }[];
+  paging: { next?: string; previous?: string };
+}
+
+const SUGGESTION_FIELDS = 'mean,genres,media_type,num_episodes,status,start_date,end_date,synopsis';
+
+/** Sugerencias personalizadas de MAL para el usuario autenticado. */
+export function getAnimeSuggestions(
+  token: string,
+  offset = 0,
+  limit = 50,
+): Promise<MalSuggestionPage> {
+  const params = new URLSearchParams({
+    fields: SUGGESTION_FIELDS,
+    limit: String(limit),
+    offset: String(offset),
+    nsfw: 'false',
+  });
+  return malFetch(`/anime/suggestions?${params.toString()}`, token);
 }

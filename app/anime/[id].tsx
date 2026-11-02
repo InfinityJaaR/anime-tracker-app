@@ -125,6 +125,16 @@ export default function AnimeDetailScreen() {
     return list;
   }, [draft, savedDraft, totalEpisodes]);
 
+  // Completar sin nota: se avisa, pero se puede actualizar igual o volver a puntuar.
+  const completingWithoutScore =
+    !!draft && !!savedDraft && draft.choice === 'completed' && draft.score === 0 && savedDraft.choice !== 'completed';
+
+  // El modal de confirmación aún se está cerrando: abrir otro Modal en el mismo frame falla en Android.
+  const backToScore = () => {
+    setConfirming(false);
+    requestAnimationFrame(() => setPicker('score'));
+  };
+
   const confirmDraft = () => {
     if (!draft || !isDirty) return;
     updateMutation.mutate(
@@ -342,7 +352,18 @@ export default function AnimeDetailScreen() {
         visible={picker === 'status'}
         value={draft?.choice ?? 'watching'}
         onClose={() => setPicker(null)}
-        onSelect={(choice) => setDraft((d) => (d ? { ...d, choice } : d))}
+        onSelect={(choice) =>
+          setDraft((d) =>
+            d
+              ? {
+                  ...d,
+                  choice,
+                  // Al completar, el progreso pasa a todos los episodios (si se conoce el total).
+                  ...(choice === 'completed' && totalEpisodes > 0 ? { episodes: totalEpisodes } : {}),
+                }
+              : d,
+          )
+        }
       />
       <EpisodePickerModal
         visible={picker === 'episodes'}
@@ -363,6 +384,13 @@ export default function AnimeDetailScreen() {
         animeTitle={anime.title}
         changes={pendingChanges}
         pending={updateMutation.isPending}
+        warning={
+          completingWithoutScore
+            ? 'No has puntuado este anime. Puedes actualizar igual sin puntuar o volver para puntuarlo.'
+            : undefined
+        }
+        fixLabel="VOLVER Y PUNTUAR"
+        onFix={backToScore}
         onCancel={() => setConfirming(false)}
         onConfirm={confirmDraft}
       />

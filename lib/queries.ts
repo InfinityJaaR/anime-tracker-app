@@ -2,25 +2,35 @@
  * Hooks de TanStack Query: listas de MAL (persistencia), datos de Jikan (lectura)
  * y traducción de sinopsis (MyMemory).
  */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
+  getAiringSeasonCatalog,
+  getSeasonPageCatalog,
   getAnimeCharactersCatalog,
   getAnimeFullCatalog,
   searchAnimeCatalog,
 } from '@/lib/api/catalog';
-import { getRecentEpisodes } from '@/lib/api/jikan';
+import { getAiringSchedule } from '@/lib/api/anilist';
+import {
+  searchAnimeFiltered,
+  type AdvancedFilters,
+  type JikanPage,
+} from '@/lib/api/jikan';
 import {
   getAnimeRanking,
   getRelatedAnime,
   getSeasonAnime,
+  malAnimeToJikan,
   searchAnimeMal,
   seasonOf,
+  type AnimeSeason,
   type MalRankingType,
 } from '@/lib/api/mal-public';
 import {
   deleteFromMyList,
   getAnimeWithMyStatus,
+  getAnimeSuggestions,
   getMyAnimeList,
   MalListItem,
   MalWatchStatus,
@@ -28,6 +38,7 @@ import {
   UpdateListStatusParams,
 } from '@/lib/api/mal';
 import { translateToSpanish } from '@/lib/api/translate';
+import type { CalendarShow } from '@/lib/calendar';
 import { useAuth } from '@/lib/auth/auth-context';
 
 export type ListFilter = MalWatchStatus | 'all';
@@ -228,15 +239,6 @@ export function useCurrentSeason() {
   });
 }
 
-export function useRecentEpisodes() {
-  return useQuery({
-    queryKey: ['discover', 'recent-episodes'],
-    staleTime: 30 * 60 * 1000,
-    retry: 1,
-    queryFn: () => getRecentEpisodes(),
-  });
-}
-
 /**
  * Búsqueda general contra MAL público con lote grande, porque los filtros de
  * género, tipo y puntuación se aplican después en cliente.
@@ -266,5 +268,99 @@ export function useSynopsisTranslation(animeId: number, synopsis: string, enable
     staleTime: Infinity,
     retry: false,
     queryFn: () => translateToSpanish(synopsis),
+  });
+}
+
+// ---------- Calendario de emisión (AniList) ----------
+
+/**
+ * Próximo episodio de los animes en emisión de la lista. El scope 'catalog' ya
+ * se persiste, así que las tarjetas muestran el último calendario conocido al abrir.
+ */
+export function useAiringSchedule(malIds: number[]) {
+  const ids = [...malIds].sort((a, b) => a - b);
+  return useQuery({
+    queryKey: ['catalog', 'airing', ids],
+    enabled: ids.length > 0,
+    staleTime: 15 * 60 * 1000,
+    retry: 1,
+    queryFn: () => getAiringSchedule(ids),
+  });
+}
+
+/**
+ * Animes en emisión esta temporada, reducidos a lo que pinta el calendario para
+ * que el caché persistido no guarde sinopsis ni metadatos innecesarios.
+ */
+export function useAiringShows() {
+  const { year, season } = seasonOf(new Date());
+  return useQuery({
+    queryKey: ['catalog', 'season-airing', year, season],
+    staleTime: 3 * 60 * 60 * 1000,
+    retry: 1,
+    queryFn: async (): Promise<CalendarShow[]> =>
+      (await getAiringSeasonCatalog()).map((anime) => ({
+        malId: anime.mal_id,
+        title: anime.title,
+        imageUrl: anime.images.jpg.large_image_url ?? anime.images.jpg.image_url,
+      })),
+  });
+}
+
+// ---------- Exploración (búsqueda avanzada y temporadas) ----------
+// Scope 'explore': no se persiste (ver shouldPersistQuery), son listas paginadas grandes.
+
+function nextPage<T>(last: JikanPage<T>) {
+  return last.pagination?.has_next_page ? last.pagination.current_page + 1 : undefined;
+}
+
+/** Búsqueda avanzada por filtros; `enabled` solo tras pulsar Buscar. */
+export function useAdvancedSearch(filters: AdvancedFilters, enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: ['explore', 'advanced', filters],
+    enabled,
+    staleTime: 10 * 60 * 1000,
+    retry: 1,
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => searchAnimeFiltered(filters, pageParam),
+    getNextPageParam: nextPage,
+  });
+}
+
+/** Animes de una temporada concreta, paginados. */
+export function useSeasonAnime(year: number, season: AnimeSeason) {
+  return useInfiniteQuery({
+    queryKey: ['explore', 'season', year, season],
+    staleTime: 30 * 60 * 1000,
+    retry: 1,
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => getSeasonPageCatalog(year, season, pageParam),
+    getNextPageParam: nextPage,
+  });
+}
+
+// ---------- Recomendaciones (sugerencias de MAL) ----------
+
+/** Sugerencias personalizadas de MAL (requieren sesión), ya en el formato de la UI. */
+export function useAnimeSuggestions() {
+  const { getAccessToken, isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: ['mal', 'suggestions'],
+    enabled: isAuthenticated,
+    staleTime: 6 * 60 * 60 * 1000,
+    retry: 1,
+    queryFn: async () => {
+      const token = await getAccessToken();
+      const all = [];
+      let offset = 0;
+      // Hasta 3 páginas de 50: suficiente para filtrar por géneros y lista propia.
+      for (let page = 0; page < 3; page++) {
+        const result = await getAnimeSuggestions(token, offset, 50);
+        all.push(...result.data.map((item) => malAnimeToJikan(item.node)));
+        if (!result.paging.next) break;
+        offset += 50;
+      }
+      return all;
+    },
   });
 }

@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -15,12 +14,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimeListCard } from '@/components/anime-list-card';
+import { AnimeResultCard } from '@/components/anime-result-card';
 import { FilterChip, FilterSheet, type FilterOption } from '@/components/filter-chips';
 import { AppColors } from '@/constants/theme';
-import type { JikanAnime } from '@/lib/api/jikan';
 import type { MalListItem } from '@/lib/api/mal';
 import { useAuth } from '@/lib/auth/auth-context';
-import { isoToDate } from '@/lib/format';
 import { GENRES, genreById, MEDIA_TYPES, mediaTypeLabel } from '@/lib/genres';
 import { useGlobalSearch, useMyList } from '@/lib/queries';
 
@@ -251,7 +249,7 @@ export default function SearchScreen() {
             </View>
           }
           renderItem={({ item }) => (
-            <GlobalResultCard
+            <AnimeResultCard
               anime={item}
               alreadyAdded={isAuthenticated && myIds.has(item.mal_id)}
               onPress={() => router.push(`/anime/${item.mal_id}`)}
@@ -314,55 +312,6 @@ function passesFilters(
   return true;
 }
 
-function GlobalResultCard({
-  anime,
-  alreadyAdded,
-  onPress,
-}: {
-  anime: JikanAnime;
-  alreadyAdded: boolean;
-  onPress: () => void;
-}) {
-  const from = isoToDate(anime.aired?.from);
-  const to = isoToDate(anime.aired?.to);
-
-  return (
-    <Pressable style={({ pressed }) => [styles.card, pressed && styles.cardPressed]} onPress={onPress}>
-      <Image
-        source={{ uri: anime.images.jpg.large_image_url ?? anime.images.jpg.image_url }}
-        style={styles.cover}
-        contentFit="cover"
-        transition={150}
-      />
-      <View style={styles.cardBody}>
-        <Text style={styles.cardTitle} numberOfLines={2}>
-          {anime.title}
-        </Text>
-        <Text style={styles.meta}>
-          {[
-            mediaTypeLabel(anime.type),
-            anime.episodes ? `${anime.episodes} eps` : null,
-            anime.score ? `★ ${anime.score.toFixed(2)}` : null,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        </Text>
-        {from || to ? (
-          <Text style={styles.meta}>
-            {from ?? '?'} - {to ?? '?'}
-          </Text>
-        ) : null}
-        {anime.synopsis ? (
-          <Text style={styles.synopsis} numberOfLines={2}>
-            {anime.synopsis}
-          </Text>
-        ) : null}
-        {alreadyAdded ? <Text style={styles.addedTag}>Ya está en tu lista</Text> : null}
-      </View>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: AppColors.background },
   header: {
@@ -417,11 +366,4 @@ const styles = StyleSheet.create({
     marginVertical: 5,
     overflow: 'hidden',
   },
-  cardPressed: { opacity: 0.85 },
-  cover: { width: 85, height: 125 },
-  cardBody: { flex: 1, padding: 12, gap: 3 },
-  cardTitle: { color: AppColors.text, fontSize: 15, fontWeight: '700', lineHeight: 20 },
-  meta: { color: AppColors.textMuted, fontSize: 12 },
-  synopsis: { color: AppColors.textMuted, fontSize: 12, lineHeight: 16, marginTop: 2 },
-  addedTag: { color: AppColors.accent, fontSize: 12, fontWeight: '600', marginTop: 2 },
 });

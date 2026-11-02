@@ -1,6 +1,14 @@
+import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
 import { useCallback, useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
+
+import { registerUpdateCheckTask } from '@/lib/background-update-task';
+import {
+  ensureUpdateChannel,
+  requestNotificationPermission,
+  UPDATE_NOTIFICATION_TYPE,
+} from '@/lib/notifications';
 
 /**
  * Gestiona las actualizaciones OTA (EAS Update).
@@ -41,6 +49,21 @@ export function useOtaUpdate() {
     return () => subscription.remove();
   }, [enabled, checkAndFetch]);
 
+  // Permiso de notificaciones y tarea de fondo que avisa de updates con la app cerrada.
+  useEffect(() => {
+    if (!enabled) return;
+    void (async () => {
+      try {
+        if (await requestNotificationPermission()) {
+          await ensureUpdateChannel();
+        }
+        await registerUpdateCheckTask();
+      } catch {
+        // Sin permiso o sin tarea de fondo queda el aviso al abrir la app.
+      }
+    })();
+  }, [enabled]);
+
   const reload = useCallback(async () => {
     try {
       await Updates.reloadAsync();
@@ -48,6 +71,19 @@ export function useOtaUpdate() {
       // Si falla el reload, el update se aplicará en el siguiente arranque.
     }
   }, []);
+
+  // Al tocar la notificación de update se aplica en cuanto esté descargado.
+  const lastResponse = Notifications.useLastNotificationResponse();
+  const handledResponse = useRef<string | null>(null);
+  useEffect(() => {
+    if (!enabled || !isUpdatePending || !lastResponse) return;
+    const data = lastResponse.notification.request.content.data;
+    if (data?.type !== UPDATE_NOTIFICATION_TYPE) return;
+    const responseId = lastResponse.notification.request.identifier;
+    if (handledResponse.current === responseId) return;
+    handledResponse.current = responseId;
+    void reload();
+  }, [enabled, isUpdatePending, lastResponse, reload]);
 
   return { isUpdatePending: enabled && isUpdatePending, reload };
 }

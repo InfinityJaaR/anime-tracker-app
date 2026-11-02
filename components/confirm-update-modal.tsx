@@ -14,6 +14,11 @@ interface Props {
   animeTitle: string;
   changes: DraftChange[];
   pending?: boolean;
+  /** Aviso que se muestra sobre los cambios (p. ej. completar sin puntuar). */
+  warning?: string;
+  /** Acción alternativa que acompaña al aviso (p. ej. volver a puntuar). */
+  fixLabel?: string;
+  onFix?: () => void;
   onCancel: () => void;
   onConfirm: () => void;
 }
@@ -24,9 +29,13 @@ export function ConfirmUpdateModal({
   animeTitle,
   changes,
   pending,
+  warning,
+  fixLabel,
+  onFix,
   onCancel,
   onConfirm,
 }: Props) {
+  const hasFix = !!warning && !!fixLabel && !!onFix;
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable style={styles.backdrop} onPress={onCancel}>
@@ -53,15 +62,27 @@ export function ConfirmUpdateModal({
             ))}
           </View>
 
+          {warning ? (
+            <View style={styles.warning}>
+              <Ionicons name="warning-outline" size={18} color={AppColors.scoreMid} />
+              <Text style={styles.warningText}>{warning}</Text>
+            </View>
+          ) : null}
+
           <View style={styles.actions}>
-            <Pressable style={styles.cancelButton} onPress={onCancel} disabled={pending}>
-              <Text style={styles.cancelText}>CANCELAR</Text>
+            <Pressable
+              style={styles.cancelButton}
+              onPress={hasFix ? onFix : onCancel}
+              disabled={pending}>
+              <Text style={styles.cancelText}>{hasFix ? fixLabel : 'CANCELAR'}</Text>
             </Pressable>
             <Pressable
               style={[styles.confirmButton, pending && styles.disabled]}
               onPress={onConfirm}
               disabled={pending}>
-              <Text style={styles.confirmText}>{pending ? 'GUARDANDO…' : 'CONFIRMAR'}</Text>
+              <Text style={styles.confirmText}>
+                {pending ? 'GUARDANDO…' : hasFix ? 'ACTUALIZAR SIN PUNTUAR' : 'CONFIRMAR'}
+              </Text>
             </Pressable>
           </View>
         </Pressable>
@@ -71,6 +92,16 @@ export function ConfirmUpdateModal({
 }
 
 const styles = StyleSheet.create({
+  warning: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 16,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(240,136,62,0.12)',
+  },
+  warningText: { flex: 1, color: AppColors.text, fontSize: 13, lineHeight: 18 },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -86,7 +117,14 @@ const styles = StyleSheet.create({
   changeValues: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   from: { color: AppColors.textMuted, fontSize: 15, flexShrink: 1 },
   to: { color: AppColors.accent, fontSize: 15, fontWeight: '700', flexShrink: 1 },
-  actions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 20, marginTop: 24 },
+  actions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 24,
+  },
   cancelButton: { paddingVertical: 8, paddingHorizontal: 8 },
   cancelText: { color: AppColors.textMuted, fontSize: 14, fontWeight: '700' },
   confirmButton: {

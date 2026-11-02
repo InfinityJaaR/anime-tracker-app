@@ -13,6 +13,8 @@ export const AppColors = {
   textMuted: '#8FA3B8',
   danger: '#E5484D',
   progressTrack: '#1E3550',
+  scoreHigh: '#3FB950',
+  scoreMid: '#F0883E',
 };
 
 const tintColorLight = '#0a7ea4';

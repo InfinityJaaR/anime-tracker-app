@@ -76,7 +76,7 @@ interface MalStudio {
   name: string;
 }
 
-interface MalAnimeDetail {
+export interface MalAnimeDetail {
   id: number;
   title: string;
   main_picture?: MalPicture;

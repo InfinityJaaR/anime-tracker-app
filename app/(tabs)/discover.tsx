@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimePosterCard } from '@/components/anime-poster-card';
 import { DiscoverSection } from '@/components/discover-section';
+import { MenuButton } from '@/components/menu-button';
 import { AppColors } from '@/constants/theme';
 import type { MalRankingType } from '@/lib/api/mal-public';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -14,7 +15,6 @@ import {
   useAnimeRanking,
   useCurrentSeason,
   useMyList,
-  useRecentEpisodes,
 } from '@/lib/queries';
 
 const TOP_FILTERS: { key: MalRankingType; label: string }[] = [
@@ -31,7 +31,6 @@ export default function DiscoverScreen() {
 
   const topQuery = useAnimeRanking(topFilter);
   const seasonQuery = useCurrentSeason();
-  const recentQuery = useRecentEpisodes();
   // Reutiliza la lista completa que ya cachean Home y Stats en vez de pedir otra.
   const listQuery = useMyList('all');
   const watching = useMemo(
@@ -44,7 +43,10 @@ export default function DiscoverScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Descubrir</Text>
+        <View style={styles.titleRow}>
+          <MenuButton />
+          <Text style={styles.headerTitle}>Descubrir</Text>
+        </View>
         <Pressable hitSlop={12} onPress={() => router.push('/search')}>
           <Ionicons name="search" size={25} color={AppColors.text} />
         </Pressable>
@@ -142,23 +144,6 @@ export default function DiscoverScreen() {
             ))}
           </View>
         </View>
-
-        {/* Episodios recientes */}
-        <DiscoverSection
-          title="Episodios recientes"
-          isLoading={recentQuery.isLoading}
-          isError={recentQuery.isError}
-          isEmpty={!recentQuery.data?.length}>
-          {(recentQuery.data ?? []).map((entry) => (
-            <AnimePosterCard
-              key={`${entry.entry.mal_id}-${entry.episodes[0]?.mal_id ?? 0}`}
-              title={entry.entry.title}
-              imageUrl={entry.entry.images.jpg.large_image_url ?? entry.entry.images.jpg.image_url}
-              caption={entry.episodes[0]?.title ?? null}
-              onPress={() => openAnime(entry.entry.mal_id)}
-            />
-          ))}
-        </DiscoverSection>
       </ScrollView>
     </SafeAreaView>
   );
@@ -173,6 +158,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   headerTitle: { color: AppColors.text, fontSize: 24, fontWeight: '700' },
   scrollContent: { paddingBottom: 32 },
   topBlock: { gap: 0 },
