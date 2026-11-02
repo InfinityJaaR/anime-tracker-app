@@ -68,5 +68,5 @@ export function shouldPersistQuery(query: Query): boolean {
   if (!defaultShouldDehydrateQuery(query)) return false;
   const [scope, kind] = query.queryKey as [string, string?];
   if (kind === 'search' || kind === 'global-search') return false;
-  return scope === 'mal' || scope === 'catalog' || scope === 'discover' || scope === 'translation';
+  return scope === 'mal' || scope === 'catalog' || scope === 'discover' || scope === 'translation' || scope === 'friends';
 }

@@ -27,9 +27,11 @@ import { AppColors } from '@/constants/theme';
 import type { MalMyListStatus, UpdateListStatusParams } from '@/lib/api/mal';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useFavorites } from '@/lib/favorites-context';
+import { describeActivity, initialsOf, isAhead } from '@/lib/friends-activity';
 import {
   useAnimeCharacters,
   useAnimeFull,
+  useFriendsData,
   useMyListStatus,
   useRelatedAnime,
   useUpdateListStatus,
@@ -69,6 +71,7 @@ export default function AnimeDetailScreen() {
   const charactersQuery = useAnimeCharacters(animeId);
   const relatedQuery = useRelatedAnime(animeId);
   const myStatusQuery = useMyListStatus(animeId);
+  const friendsQuery = useFriendsData();
   const updateMutation = useUpdateListStatus();
   const { isFavorite, toggle: toggleFavorite } = useFavorites();
 
@@ -78,6 +81,12 @@ export default function AnimeDetailScreen() {
 
   const anime = animeQuery.data;
   const myStatus = myStatusQuery.data?.my_list_status;
+
+  // Amigos que lo tienen en lo que ven ahora o en su actividad reciente.
+  const friendsHere = friendsQuery.data.flatMap((friend) => {
+    const entry = [...friend.watching, ...friend.recent].find((item) => item.node.id === animeId);
+    return entry ? [{ username: friend.username, entry }] : [];
+  });
   const totalEpisodes = anime?.episodes ?? myStatusQuery.data?.num_episodes ?? 0;
 
   // Los pickers solo tocan este borrador; nada viaja a MAL hasta pulsar "Actualizar".
@@ -283,6 +292,27 @@ export default function AnimeDetailScreen() {
           </View>
         ) : null}
 
+        {/* Amigos */}
+        {friendsHere.length > 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Amigos</Text>
+            {friendsHere.map(({ username, entry }) => (
+              <View key={username} style={styles.friendRow}>
+                <View style={styles.friendAvatar}>
+                  <Text style={styles.friendAvatarText}>{initialsOf(username)}</Text>
+                </View>
+                <Text style={styles.friendText} numberOfLines={2}>
+                  <Text style={styles.friendName}>{username} </Text>
+                  {describeActivity(entry)}
+                </Text>
+                {isAhead(entry.list_status, myStatus) ? (
+                  <Text style={styles.friendAhead}>⚠ Va adelante</Text>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         {/* Sinopsis */}
         {anime.synopsis ? <SynopsisCard animeId={animeId} synopsis={anime.synopsis} /> : null}
 
@@ -447,6 +477,19 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  friendRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
+  friendAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: AppColors.surfaceLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  friendAvatarText: { color: AppColors.text, fontSize: 12, fontWeight: '800' },
+  friendText: { flex: 1, color: AppColors.textMuted, fontSize: 14, lineHeight: 19 },
+  friendName: { color: AppColors.accent, fontWeight: '700' },
+  friendAhead: { color: AppColors.scoreMid, fontSize: 12, fontWeight: '700' },
   container: { flex: 1, backgroundColor: AppColors.background },
   center: { alignItems: 'center', justifyContent: 'center', gap: 16 },
   scrollContent: { paddingBottom: 40 },

@@ -36,6 +36,16 @@ gh release create v1.3.0 anime-tracker-1.3.0.apk --title "v1.3.0" --notes "Qué 
 
 El aviso solo funciona en APKs que ya traen este código (desde `1.2.0`): quien tenga una versión anterior debe instalar la `1.2.0` a mano una vez.
 
+## Amigos
+
+MyAnimeList no tiene sistema de amigos en su API, pero sí permite leer la **lista pública** de cualquier usuario. En el menú lateral, **Amigos** guarda en el teléfono los usuarios de MAL que agregues y muestra: su **actividad reciente**, lo que cada uno está **viendo** (con su episodio y nota) y, en el detalle de un anime, qué amigos lo ven. Se avisa con "⚠ Va adelante" cuando un amigo va por delante de ti en un anime de tu lista.
+
+Límites: la lista del amigo debe ser pública, no hay solicitudes ni aceptación (el amigo ni siquiera necesita la app), no hay foto de perfil ni notificaciones instantáneas (eso requeriría un servidor propio). Máximo 20 amigos.
+
+## Buscar por imagen (v1.3.0)
+
+En el menú lateral, **Buscar por imagen** identifica un anime a partir de una captura (por ejemplo de un reel o TikTok): eliges la imagen de la galería, la recortas a la escena y la app consulta [trace.moe](https://trace.moe), que devuelve el anime, el episodio, el minuto y el porcentaje de coincidencia. Es gratis y sin clave, con **100 búsquedas al mes por conexión**; la imagen se envía a ese servicio externo. Funciona con capturas de episodios; falla con fanart, imágenes muy editadas o recortes extremos y con animes muy nuevos que aún no indexa. Usa `expo-image-picker` (librería nativa), por eso es la versión `1.3.0` y requiere APK nuevo.
+
 ## Requisitos
 
 - Node.js (recomendado LTS)

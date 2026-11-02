@@ -2,7 +2,7 @@
  * Hooks de TanStack Query: listas de MAL (persistencia), datos de Jikan (lectura)
  * y traducción de sinopsis (MyMemory).
  */
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   getAiringSeasonCatalog,
@@ -12,6 +12,7 @@ import {
   searchAnimeCatalog,
 } from '@/lib/api/catalog';
 import { getAiringSchedule } from '@/lib/api/anilist';
+import { FriendListError, getFriendOverview, type FriendOverview } from '@/lib/api/mal-friends';
 import {
   searchAnimeFiltered,
   type AdvancedFilters,
@@ -39,6 +40,7 @@ import {
 } from '@/lib/api/mal';
 import { translateToSpanish } from '@/lib/api/translate';
 import type { CalendarShow } from '@/lib/calendar';
+import { useFriends } from '@/lib/friends-context';
 import { useAuth } from '@/lib/auth/auth-context';
 
 export type ListFilter = MalWatchStatus | 'all';
@@ -363,4 +365,47 @@ export function useAnimeSuggestions() {
       return all;
     },
   });
+}
+
+// ---------- Amigos (listas públicas de MAL) ----------
+
+export interface FriendData {
+  username: string;
+  watching: MalListItem[];
+  recent: MalListItem[];
+  isLoading: boolean;
+  /** "Usuario no encontrado", "Su lista es privada"… */
+  error: FriendListError | null;
+}
+
+/** Lo que ve cada amigo y su actividad reciente, una consulta por amigo. */
+export function useFriendsData(): { data: FriendData[]; isLoading: boolean; refetch: () => void } {
+  const { friends } = useFriends();
+  const results = useQueries({
+    queries: friends.map((friend) => ({
+      queryKey: ['friends', friend.username.toLowerCase()],
+      staleTime: 15 * 60 * 1000,
+      // Solo los fallos de red merecen reintento: 404 y 403 son definitivos.
+      retry: (count: number, error: Error) =>
+        error instanceof FriendListError && error.kind === 'network' && count < 1,
+      queryFn: (): Promise<FriendOverview> => getFriendOverview(friend.username),
+    })),
+  });
+
+  const data = friends.map((friend, index): FriendData => {
+    const result = results[index];
+    const error = result?.error;
+    return {
+      username: friend.username,
+      watching: result?.data?.watching ?? [],
+      recent: result?.data?.recent ?? [],
+      isLoading: !!result?.isLoading,
+      error: error instanceof FriendListError ? error : error ? new FriendListError('network', String(error)) : null,
+    };
+  });
+  return {
+    data,
+    isLoading: data.some((friend) => friend.isLoading),
+    refetch: () => results.forEach((result) => void result.refetch()),
+  };
 }

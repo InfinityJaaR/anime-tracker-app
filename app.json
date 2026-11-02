@@ -2,7 +2,7 @@
   "expo": {
     "name": "Anime Tracker",
     "slug": "anime-tracker-app",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "animetrackerapp",
@@ -73,6 +73,12 @@
         {
           "icon": "./assets/images/android-icon-monochrome.png",
           "color": "#2F80ED"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Anime Tracker necesita acceder a tus fotos para buscar un anime a partir de una captura."
         }
       ]
     ],

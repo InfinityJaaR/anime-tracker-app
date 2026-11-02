@@ -40,6 +40,8 @@ const PRIMARY_ITEMS: MenuItem[] = [
 const SECONDARY_ITEMS: MenuItem[] = [
   { key: 'advanced-search', icon: 'pricetags', title: 'Búsqueda avanzada', route: '/advanced-search' },
   { key: 'seasonal', icon: 'calendar', title: 'Temporadas de anime', route: '/seasonal' },
+  { key: 'image-search', icon: 'image', title: 'Buscar por imagen', subtitle: 'Encuentra un anime con una captura', route: '/image-search' },
+  { key: 'friends', icon: 'people', title: 'Amigos', subtitle: 'Lo que ven tus amigos', route: '/friends' },
 ];
 
 const SETTINGS_ITEM: MenuItem = {

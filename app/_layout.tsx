@@ -15,6 +15,7 @@ import { AppColors } from '@/constants/theme';
 import { useNotificationLinks } from '@/hooks/use-notification-links';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import { FavoritesProvider } from '@/lib/favorites-context';
+import { FriendsProvider } from '@/lib/friends-context';
 import { SideMenuProvider } from '@/lib/side-menu-context';
 import {
   CACHE_BUSTER,
@@ -73,6 +74,7 @@ export default function RootLayout() {
       }}>
       <AuthProvider>
         <FavoritesProvider>
+          <FriendsProvider>
           <ThemeProvider value={navigationTheme}>
             <SideMenuProvider>
             <Stack>
@@ -84,6 +86,9 @@ export default function RootLayout() {
               <Stack.Screen name="advanced-search" options={{ headerShown: false }} />
               <Stack.Screen name="seasonal" options={{ headerShown: false }} />
               <Stack.Screen name="settings" options={{ headerShown: false }} />
+              <Stack.Screen name="image-search" options={{ headerShown: false }} />
+              <Stack.Screen name="friends" options={{ headerShown: false }} />
+              <Stack.Screen name="friend/[name]" options={{ headerShown: false }} />
             </Stack>
             <SideMenu />
             <StatusBar style="light" />
@@ -91,6 +96,7 @@ export default function RootLayout() {
             <NotificationLinks />
             </SideMenuProvider>
           </ThemeProvider>
+          </FriendsProvider>
         </FavoritesProvider>
       </AuthProvider>
     </PersistQueryClientProvider>
